@@ -130,6 +130,22 @@ async function loadPlans() {
                 badge.style.display = 'none';
             }
         } catch(e) {}
+
+        // Load risk score
+        try {
+            const risk = await api('/api/analytics/risk-score');
+            const bar = document.getElementById('risk-score-bar');
+            if (risk.score > 0) {
+                const color = risk.score >= 60 ? 'var(--danger)' : risk.score >= 30 ? 'var(--warning)' : 'var(--success)';
+                bar.style.display = 'block';
+                bar.style.borderLeftColor = color;
+                bar.style.borderLeftWidth = '3px';
+                bar.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><strong>${risk.level}</strong><span style="font-size:0.85rem;color:${color}">风险指数: ${risk.score}/100</span></div>` +
+                    (risk.factors.length ? `<div style="margin-top:0.4rem;font-size:0.8rem;color:var(--text-dim)">${risk.factors.join(' | ')}</div>` : '');
+            } else {
+                bar.style.display = 'none';
+            }
+        } catch(e) {}
     } catch (e) { toast(e.message, 'error'); }
 }
 

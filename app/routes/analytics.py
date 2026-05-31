@@ -692,3 +692,106 @@ async def mood_trend():
         "low_mood_streak": low_streak,
         "avg_mood": round(sum(r["avg_mood"] for r in rows) / len(rows), 2) if rows else 0,
     }
+
+
+@router.get("/risk-score")
+async def daily_risk_score():
+    """每日风险评分 — 综合评估今天交易的危险程度 (0-100)."""
+    from datetime import date, timedelta
+    db = await get_db()
+    try:
+        today = date.today()
+        # Recent PnL
+        cursor = await db.execute(
+            "SELECT pnl, mood, trade_date FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date DESC LIMIT 10"
+        )
+        recent = [dict(r) for r in await cursor.fetchall()]
+
+        # Active vulnerabilities
+        cursor = await db.execute(
+            "SELECT weight FROM vulnerability_matrix WHERE weight >= 2.0"
+        )
+        high_vulns = await cursor.fetchall()
+
+        # Today's plan status
+        cursor = await db.execute(
+            "SELECT COUNT(*) as total, SUM(done) as completed FROM plans WHERE trade_date = ? AND plan_type='today'",
+            (today.isoformat(),)
+        )
+        plan_row = await cursor.fetchone()
+
+        # Consecutive losses
+        consecutive_losses = 0
+        for r in recent:
+            if r["pnl"] < 0:
+                consecutive_losses += 1
+            else:
+                break
+
+        # Consecutive wins (overconfidence risk)
+        consecutive_wins = 0
+        for r in recent:
+            if r["pnl"] > 0:
+                consecutive_wins += 1
+            else:
+                break
+    finally:
+        await db.close()
+
+    # Calculate risk factors
+    risk = 0
+    factors = []
+
+    # Factor 1: Consecutive losses (max 30 points)
+    if consecutive_losses >= 3:
+        risk += 30
+        factors.append(f"连续亏损{consecutive_losses}天 — 报复性交易风险极高")
+    elif consecutive_losses >= 2:
+        risk += 20
+        factors.append(f"连续亏损{consecutive_losses}天 — 注意情绪管理")
+    elif consecutive_losses == 1:
+        risk += 10
+        factors.append("昨日亏损 — 保持冷静")
+
+    # Factor 2: Consecutive wins / overconfidence (max 20 points)
+    if consecutive_wins >= 4:
+        risk += 20
+        factors.append(f"连续盈利{consecutive_wins}天 — 膨胀期，极易放松纪律")
+    elif consecutive_wins >= 3:
+        risk += 10
+        factors.append(f"连续盈利{consecutive_wins}天 — 警惕过度自信")
+
+    # Factor 3: High-weight vulnerabilities (max 20 points)
+    high_vuln_count = len(high_vulns)
+    if high_vuln_count >= 3:
+        risk += 20
+        factors.append(f"{high_vuln_count}个高权重弱点活跃 — 心理防线薄弱")
+    elif high_vuln_count >= 1:
+        risk += 10
+        factors.append(f"{high_vuln_count}个高权重弱点活跃")
+
+    # Factor 4: Low mood trend (max 15 points)
+    moods = [r["mood"] for r in recent[:3] if r.get("mood")]
+    if moods and sum(moods) / len(moods) <= 2:
+        risk += 15
+        factors.append("近期情绪持续低迷")
+    elif moods and sum(moods) / len(moods) <= 3:
+        risk += 5
+
+    # Factor 5: No plan today (max 15 points)
+    if plan_row["total"] == 0:
+        risk += 15
+        factors.append("今日无交易计划 — 盲目交易风险")
+    elif plan_row["total"] > 0 and (plan_row["completed"] or 0) / plan_row["total"] < 0.5:
+        risk += 5
+
+    risk = min(100, risk)
+    level = "🟢 低风险" if risk < 30 else "🟡 中等风险" if risk < 60 else "🔴 高风险"
+
+    return {
+        "score": risk,
+        "level": level,
+        "factors": factors,
+        "consecutive_losses": consecutive_losses,
+        "consecutive_wins": consecutive_wins,
+    }
