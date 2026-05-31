@@ -6,7 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import date, datetime
 from app.database import get_db, get_db_path
-from app.feishu import send_daily_notification, send_plan_incomplete_alert, send_no_review_alert
+from app.feishu import send_daily_notification, send_plan_incomplete_alert, send_no_review_alert, send_risk_alert
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -72,5 +72,18 @@ def start_scheduler():
     scheduler.add_job(send_plan_incomplete_alert, CronTrigger(hour=20, minute=0), id="plan_incomplete", replace_existing=True)
     scheduler.add_job(daily_auto_backup, CronTrigger(hour=23, minute=55), id="daily_backup", replace_existing=True)
     scheduler.add_job(send_no_review_alert, CronTrigger(hour=21, minute=0), id="no_review_alert", replace_existing=True)
+    scheduler.add_job(morning_risk_check, CronTrigger(hour=8, minute=45), id="morning_risk", replace_existing=True)
     scheduler.start()
     logger.info("Scheduler started")
+
+
+async def morning_risk_check():
+    """Check risk score in the morning and send alert if high."""
+    try:
+        from app.routes.analytics import daily_risk_score
+        result = await daily_risk_score()
+        if result["score"] >= 50:
+            await send_risk_alert(result["score"], result["level"], result["factors"])
+            logger.info(f"Risk alert sent: score={result['score']}")
+    except Exception as e:
+        logger.error(f"Morning risk check failed: {e}")

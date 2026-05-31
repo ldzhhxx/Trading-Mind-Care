@@ -316,3 +316,27 @@ async def send_milestone_notification(milestone: str):
     title = "🏆 里程碑达成！"
     body = f"**恭喜！** {milestone}\n\n坚持就是最大的优势。继续保持！"
     await send_feishu_card(webhook, title, body)
+
+
+async def send_risk_alert(score: int, level: str, factors: list[str]):
+    """Send risk score alert when score is high."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'feishu_webhook'")
+        row = await cursor.fetchone()
+        webhook = row["value"] if row else ""
+        if not webhook:
+            return
+    finally:
+        await db.close()
+
+    if score < 50:
+        return  # Only alert on medium-high risk
+
+    title = f"🚨 交易风险预警 — {level}"
+    lines = [f"**风险指数: {score}/100**\n"]
+    lines.append("**风险因素：**")
+    for f in factors:
+        lines.append(f"- {f}")
+    lines.append("\n---\n**建议：减少仓位或暂停交易，等待状态恢复。**")
+    await send_feishu_card(webhook, title, "\n".join(lines))
