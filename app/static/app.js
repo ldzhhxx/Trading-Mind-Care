@@ -1076,7 +1076,13 @@ window.addEventListener('beforeunload', e => {
 const emotionInput = document.getElementById('emotion-input');
 const savedDraft = localStorage.getItem('review_draft');
 if (savedDraft) emotionInput.value = savedDraft;
-emotionInput.addEventListener('input', () => localStorage.setItem('review_draft', emotionInput.value));
+emotionInput.addEventListener('input', () => {
+    localStorage.setItem('review_draft', emotionInput.value);
+    document.getElementById('char-count').textContent = `${emotionInput.value.length} / 5000`;
+    // Auto-expand
+    emotionInput.style.height = 'auto';
+    emotionInput.style.height = Math.min(300, emotionInput.scrollHeight) + 'px';
+});
 // Clear draft on successful submit
 const origSubmit = submitReview;
 // (draft cleared inside submitReview after success via emotion-input.value = '')
