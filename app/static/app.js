@@ -1434,6 +1434,44 @@ async function loadAnalytics(type) {
                     <div class="stat-card"><div class="value">${m.avg_abs_pnl}</div><div class="label">平均绝对盈亏</div></div>
                 </div>`;
             }
+        } else if (type === 'periodicity') {
+            data = await api('/api/analytics/periodicity');
+            html = `<h3>盈亏周期性分析</h3>`;
+            // Best/worst week
+            if (data.best_week && data.worst_week) {
+                html += `<div class="stats-grid" style="margin-bottom:1rem">
+                    <div class="stat-card"><div class="value positive">+${data.best_week.pnl}</div><div class="label">最佳周 ${data.best_week.week}</div></div>
+                    <div class="stat-card"><div class="value negative">${data.worst_week.pnl}</div><div class="label">最差周 ${data.worst_week.week}</div></div>
+                </div>`;
+            }
+            // Weekday pattern
+            if (data.weekday_pattern && data.weekday_pattern.length) {
+                const maxAbs = Math.max(...data.weekday_pattern.map(d => Math.abs(d.avg_pnl)), 1);
+                html += `<h4>星期规律</h4><div style="display:flex;gap:0.5rem;margin:0.8rem 0;align-items:flex-end;height:80px">`;
+                html += data.weekday_pattern.map(d => {
+                    const h = Math.max(8, Math.abs(d.avg_pnl) / maxAbs * 60);
+                    const color = d.avg_pnl >= 0 ? 'var(--success)' : 'var(--danger)';
+                    return `<div style="flex:1;text-align:center"><div style="height:${h}px;background:${color};border-radius:3px;margin:0 auto;width:80%"></div><div style="font-size:0.7rem;margin-top:0.3rem">${d.day}</div><div style="font-size:0.7rem;color:var(--text-dim)">${d.avg_pnl >= 0 ? '+' : ''}${d.avg_pnl}</div></div>`;
+                }).join('');
+                html += `</div>`;
+            }
+            // Weekly trend
+            if (data.weekly && data.weekly.length) {
+                const maxW = Math.max(...data.weekly.map(w => Math.abs(w.pnl)), 1);
+                html += `<h4 style="margin-top:1rem">近12周盈亏</h4><div style="display:flex;gap:2px;align-items:center;height:60px;margin:0.5rem 0">`;
+                html += data.weekly.map(w => {
+                    const h = Math.max(4, Math.abs(w.pnl) / maxW * 50);
+                    const color = w.pnl >= 0 ? 'var(--success)' : 'var(--danger)';
+                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" title="${w.week}: ${w.pnl > 0 ? '+' : ''}${w.pnl} (${w.days}天)"><div style="width:80%;height:${h}px;background:${color};border-radius:2px"></div></div>`;
+                }).join('');
+                html += `</div>`;
+            }
+            // Monthly trend
+            if (data.monthly && data.monthly.length) {
+                html += `<h4 style="margin-top:1rem">近6月盈亏</h4><div class="stats-grid">`;
+                html += data.monthly.map(m => `<div class="stat-card"><div class="value ${m.pnl >= 0 ? 'positive' : 'negative'}">${m.pnl >= 0 ? '+' : ''}${m.pnl}</div><div class="label">${m.month} (${m.days}天)</div></div>`).join('');
+                html += `</div>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }

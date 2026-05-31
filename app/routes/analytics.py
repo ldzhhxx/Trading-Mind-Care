@@ -209,6 +209,67 @@ async def session_analysis():
         await db.close()
 
 
+@router.get("/periodicity")
+async def pnl_periodicity():
+    """盈亏周期性分析：按周、按月的表现规律."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, SUM(pnl) as daily_pnl FROM reviews WHERE pnl IS NOT NULL GROUP BY trade_date ORDER BY trade_date"
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if not rows:
+        return {"weekly": [], "monthly": [], "insight": "数据不足"}
+
+    from collections import defaultdict
+    # Weekly aggregation (ISO week)
+    weekly = defaultdict(lambda: {"pnl": 0, "days": 0})
+    for r in rows:
+        d = date.fromisoformat(r["trade_date"])
+        week_key = f"{d.isocalendar()[0]}-W{d.isocalendar()[1]:02d}"
+        weekly[week_key]["pnl"] += r["daily_pnl"]
+        weekly[week_key]["days"] += 1
+
+    weekly_list = [{"week": k, "pnl": round(v["pnl"], 1), "days": v["days"]} for k, v in sorted(weekly.items())][-12:]
+
+    # Monthly aggregation
+    monthly = defaultdict(lambda: {"pnl": 0, "days": 0})
+    for r in rows:
+        month_key = r["trade_date"][:7]
+        monthly[month_key]["pnl"] += r["daily_pnl"]
+        monthly[month_key]["days"] += 1
+
+    monthly_list = [{"month": k, "pnl": round(v["pnl"], 1), "days": v["days"]} for k, v in sorted(monthly.items())[-6:]]
+
+    # Weekday pattern
+    dow_pnl = defaultdict(list)
+    for r in rows:
+        d = date.fromisoformat(r["trade_date"])
+        dow_pnl[d.weekday()].append(r["daily_pnl"])
+
+    dow_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    weekday_pattern = []
+    for i in range(7):
+        if dow_pnl[i]:
+            avg = sum(dow_pnl[i]) / len(dow_pnl[i])
+            weekday_pattern.append({"day": dow_names[i], "avg_pnl": round(avg, 1), "count": len(dow_pnl[i])})
+
+    # Find best/worst periods
+    best_week = max(weekly_list, key=lambda x: x["pnl"]) if weekly_list else None
+    worst_week = min(weekly_list, key=lambda x: x["pnl"]) if weekly_list else None
+
+    return {
+        "weekly": weekly_list,
+        "monthly": monthly_list,
+        "weekday_pattern": weekday_pattern,
+        "best_week": best_week,
+        "worst_week": worst_week,
+    }
+
+
 @router.post("/ai-week-compare")
 async def ai_week_compare():
     """AI 对比本周 vs 上周的表现变化."""
