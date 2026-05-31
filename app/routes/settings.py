@@ -18,6 +18,10 @@ class FeishuConfig(BaseModel):
     notify_time: str = "08:30"
 
 
+class ExtraConfig(BaseModel):
+    critique_intensity: str = "3"
+
+
 @router.get("")
 async def get_settings():
     db = await get_db()
@@ -59,6 +63,20 @@ async def save_feishu_settings(config: FeishuConfig):
                 "INSERT OR REPLACE INTO sys_config (key, value) VALUES (?, ?)",
                 (key, value),
             )
+        await db.commit()
+        return {"ok": True}
+    finally:
+        await db.close()
+
+
+@router.post("/llm-extra")
+async def save_extra_settings(config: ExtraConfig):
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT OR REPLACE INTO sys_config (key, value) VALUES (?, ?)",
+            ("critique_intensity", config.critique_intensity),
+        )
         await db.commit()
         return {"ok": True}
     finally:

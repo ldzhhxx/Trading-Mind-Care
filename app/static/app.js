@@ -491,6 +491,7 @@ async function loadSettings() {
         document.getElementById('cfg-model-name').value = cfg.model_name || '';
         document.getElementById('cfg-feishu-webhook').value = cfg.feishu_webhook || '';
         document.getElementById('cfg-notify-time').value = cfg.notify_time || '08:30';
+        document.getElementById('cfg-intensity').value = cfg.critique_intensity || '3';
     } catch (e) { toast(e.message, 'error'); }
 }
 
