@@ -22,7 +22,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
         const tab = btn.dataset.tab;
         if (tab === 'plans') loadPlans();
-        else if (tab === 'review') loadReviews();
+        else if (tab === 'review') { document.getElementById('review-date-input').value = new Date().toISOString().slice(0,10); loadReviews(); }
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
         else if (tab === 'daily') loadDailyReport();
@@ -213,6 +213,7 @@ async function submitReview() {
 
     const pnlVal = document.getElementById('pnl-input').value;
     const pnl = pnlVal ? parseFloat(pnlVal) : null;
+    const trade_date = document.getElementById('review-date-input').value || null;
 
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner"></span>AI 正在分析你的交易...';
@@ -226,7 +227,7 @@ async function submitReview() {
         const resp = await fetch('/api/reviews/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pnl, emotion_log: emotion }),
+            body: JSON.stringify({ pnl, emotion_log: emotion, trade_date }),
         });
 
         const reader = resp.body.getReader();
@@ -262,7 +263,7 @@ async function submitReview() {
         box.className = 'critique-box warning-mode';
         // Fallback: submit without streaming
         try {
-            await api('/api/reviews', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion }) });
+            await api('/api/reviews', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion, trade_date }) });
             loadReviews();
         } catch (e2) { toast(e2.message, 'error'); }
     } finally {
