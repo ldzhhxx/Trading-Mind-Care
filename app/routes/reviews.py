@@ -112,6 +112,19 @@ async def get_review_detail(review_id: int):
         await db.close()
 
 
+@router.delete("/{review_id}")
+async def delete_review(review_id: int):
+    db = await get_db()
+    try:
+        cursor = await db.execute("DELETE FROM reviews WHERE id = ?", (review_id,))
+        await db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="复盘不存在")
+        return {"ok": True}
+    finally:
+        await db.close()
+
+
 @router.post("")
 async def create_review(review: ReviewCreate):
     trade_date = review.trade_date or date.today().isoformat()

@@ -417,6 +417,11 @@ async function toggleReviewDetail(el, id) {
         if (r.ai_critique) {
             html += `<div class="detail-section"><strong>🔥 AI 拷打：</strong><p>${esc(r.ai_critique)}</p></div>`;
         }
+        if (r.mood) {
+            const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
+            html += `<div class="detail-section"><strong>情绪：</strong> ${moods[r.mood]} (${r.mood}/5)</div>`;
+        }
+        html += `<div style="margin-top:0.5rem"><button class="secondary" onclick="deleteReview(${id})" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem;color:var(--danger)">🗑️ 删除此复盘</button></div>`;
         detail.innerHTML = html;
         detail.dataset.loaded = '1';
     } catch (e) { detail.innerHTML = '<em>加载失败</em>'; }
@@ -427,6 +432,15 @@ async function exportReviews() {
         const data = await api('/api/reviews?limit=9999');
         downloadJSON(data, 'reviews.json');
         toast('导出成功');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteReview(id) {
+    if (!confirm('确定删除此复盘记录？此操作不可恢复。')) return;
+    try {
+        await api(`/api/reviews/${id}`, { method: 'DELETE' });
+        toast('已删除');
+        loadReviews();
     } catch (e) { toast(e.message, 'error'); }
 }
 
