@@ -112,6 +112,7 @@ async def init_db():
             ("notify_time", "08:30"),
             ("last_decay_date", ""),
             ("last_notify_date", ""),
+            ("decay_rate", "0.98"),
         ]
         for key, value in defaults:
             await db.execute(

@@ -18,7 +18,12 @@ async def daily_decay():
         if row and row["value"] == today:
             return
 
-        await db.execute("UPDATE vulnerability_matrix SET weight = weight * 0.98 WHERE weight > 0.1")
+        # Get configurable decay rate
+        cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'decay_rate'")
+        dr = await cursor.fetchone()
+        decay_rate = float(dr["value"]) if dr and dr["value"] else 0.98
+
+        await db.execute(f"UPDATE vulnerability_matrix SET weight = weight * ? WHERE weight > 0.1", (decay_rate,))
         await db.execute(
             "INSERT OR REPLACE INTO sys_config (key, value) VALUES ('last_decay_date', ?)",
             (today,),

@@ -22,6 +22,10 @@ class ExtraConfig(BaseModel):
     critique_intensity: str = "3"
 
 
+class DecayConfig(BaseModel):
+    decay_rate: str = "0.98"
+
+
 @router.get("")
 async def get_settings():
     db = await get_db()
@@ -76,6 +80,20 @@ async def save_extra_settings(config: ExtraConfig):
         await db.execute(
             "INSERT OR REPLACE INTO sys_config (key, value) VALUES (?, ?)",
             ("critique_intensity", config.critique_intensity),
+        )
+        await db.commit()
+        return {"ok": True}
+    finally:
+        await db.close()
+
+
+@router.post("/decay")
+async def save_decay_settings(config: DecayConfig):
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT OR REPLACE INTO sys_config (key, value) VALUES (?, ?)",
+            ("decay_rate", config.decay_rate),
         )
         await db.commit()
         return {"ok": True}
