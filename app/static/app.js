@@ -714,6 +714,21 @@ async function loadStats() {
             </div>`;
         }
 
+        // Equity curve
+        if (data.equity_curve && data.equity_curve.length > 1) {
+            const eqMax = Math.max(...data.equity_curve.map(e => e.equity));
+            const eqMin = Math.min(...data.equity_curve.map(e => e.equity));
+            const range = Math.max(eqMax - eqMin, 1);
+            html += `<h3 style="margin:1.5rem 0 0.8rem">资金曲线（近30日）</h3>
+            <div style="display:flex;align-items:flex-end;gap:2px;height:60px;border-bottom:1px solid var(--surface2);margin-bottom:1rem">
+                ${data.equity_curve.map(e => {
+                    const h = Math.max(2, ((e.equity - eqMin) / range) * 55);
+                    const color = e.equity >= 0 ? 'var(--success)' : 'var(--danger)';
+                    return `<div style="flex:1;height:${h}px;background:${color};border-radius:2px 2px 0 0;opacity:0.8" title="${e.date}: ${e.equity}"></div>`;
+                }).join('')}
+            </div>`;
+        }
+
         // Top weaknesses by hit_count
         if (data.top_weaknesses.length) {
             html += `<h3 style="margin:1.5rem 0 0.8rem">高频弱点 Top 5（按触发次数）</h3>`;

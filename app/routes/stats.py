@@ -150,6 +150,7 @@ async def get_stats():
         peak = 0
         max_dd = 0
         current_dd = 0
+        equity_curve = []
         for row in all_daily:
             cumulative += row["daily_pnl"] or 0
             if cumulative > peak:
@@ -157,7 +158,10 @@ async def get_stats():
             dd = peak - cumulative
             if dd > max_dd:
                 max_dd = dd
+            equity_curve.append({"date": row["trade_date"], "equity": round(cumulative, 1)})
         current_dd = peak - cumulative if peak > cumulative else 0
+        # Only keep last 30 points for chart
+        equity_curve = equity_curve[-30:]
 
         return {
             "review_count": review_count,
@@ -183,6 +187,7 @@ async def get_stats():
             "weekday_perf": weekday_perf,
             "avg_review_len": round(avg_review_len),
             "peak_hours": peak_hours,
+            "equity_curve": equity_curve,
         }
     finally:
         await db.close()
