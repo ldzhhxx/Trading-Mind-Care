@@ -110,6 +110,13 @@ async def get_stats():
         )
         mood_pnl_corr = [dict(r) for r in await cursor.fetchall()]
 
+        # Weekday performance
+        cursor = await db.execute(
+            "SELECT CAST(strftime('%w', trade_date) AS INTEGER) as dow, AVG(pnl) as avg_pnl, COUNT(*) as cnt "
+            "FROM reviews WHERE pnl IS NOT NULL GROUP BY dow ORDER BY dow"
+        )
+        weekday_perf = [dict(r) for r in await cursor.fetchall()]
+
         # Top weaknesses
         cursor = await db.execute(
             "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
@@ -162,6 +169,7 @@ async def get_stats():
             "current_drawdown": round(current_dd, 1),
             "last_month_pnl": float(last_month_pnl),
             "last_month_trades": last_month_trades,
+            "weekday_perf": weekday_perf,
         }
     finally:
         await db.close()

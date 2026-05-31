@@ -681,6 +681,19 @@ async function loadStats() {
             html += `</div>`;
         }
 
+        // Weekday performance
+        if (data.weekday_perf && data.weekday_perf.length) {
+            const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            html += `<h3 style="margin:1.5rem 0 0.8rem">星期表现分析</h3>`;
+            html += `<div style="display:flex;gap:0.8rem;flex-wrap:wrap">`;
+            html += data.weekday_perf.map(d => {
+                const avgPnl = d.avg_pnl || 0;
+                const cls = avgPnl >= 0 ? 'positive' : 'negative';
+                return `<div class="stat-card" style="min-width:70px"><div class="value" style="font-size:1rem">${days[d.dow]}</div><div class="${cls}" style="font-family:var(--font-mono);font-size:0.85rem">${avgPnl >= 0 ? '+' : ''}${avgPnl.toFixed(1)}</div><div style="font-size:0.7rem;color:var(--text-dim)">${d.cnt}次</div></div>`;
+            }).join('');
+            html += `</div>`;
+        }
+
         if (!data.top_weaknesses.length && !data.mood_pnl_corr?.length) {
             html += '<div class="empty-state"><div class="icon">📈</div><div class="msg">暂无统计数据</div></div>';
         }
