@@ -48,6 +48,13 @@ async def get_stats():
             else:
                 break
 
+        # Win rate
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM reviews WHERE pnl > 0")
+        wins = (await cursor.fetchone())["cnt"]
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM reviews WHERE pnl IS NOT NULL AND pnl != 0")
+        trades_with_pnl = (await cursor.fetchone())["cnt"]
+        win_rate = (wins / trades_with_pnl * 100) if trades_with_pnl > 0 else 0
+
         # Top weaknesses
         cursor = await db.execute(
             "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
@@ -68,6 +75,7 @@ async def get_stats():
             "week_pnl": float(week_pnl),
             "month_pnl": float(month_pnl),
             "streak_days": streak,
+            "win_rate": round(win_rate, 1),
             "top_weaknesses": top_weaknesses,
             "pnl_trend": pnl_trend,
         }

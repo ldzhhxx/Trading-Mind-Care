@@ -245,9 +245,11 @@ async function submitReview() {
     }
 }
 
-async function loadReviews() {
+async function loadReviews(query) {
     try {
-        const reviews = await api(`/api/reviews?limit=${PAGE_SIZE}&offset=${reviewPage * PAGE_SIZE}`);
+        let url = `/api/reviews?limit=${PAGE_SIZE}&offset=${reviewPage * PAGE_SIZE}`;
+        if (query) url += `&q=${encodeURIComponent(query)}`;
+        const reviews = await api(url);
         const el = document.getElementById('review-history');
         if (!reviews.length && reviewPage === 0) {
             el.innerHTML = '<div class="empty-state"><div class="icon">🔥</div><div class="msg">暂无复盘记录</div><div class="hint">提交你的第一次复盘，接受 AI 拷打</div></div>';
@@ -270,6 +272,12 @@ async function loadReviews() {
         if (reviews.length === PAGE_SIZE) html += `<button class="secondary" onclick="reviewPage++;loadReviews()" style="margin:0 0.3rem">下一页 →</button>`;
         pag.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
+}
+
+function searchReviews() {
+    const q = document.getElementById('review-search').value.trim();
+    reviewPage = 0;
+    loadReviews(q);
 }
 
 async function toggleReviewDetail(el, id) {
@@ -407,6 +415,7 @@ async function loadStats() {
                 <div class="stat-card"><div class="value ${monthClass}">${data.month_pnl >= 0 ? '+' : ''}${data.month_pnl.toFixed(1)}</div><div class="label">本月盈亏</div></div>
                 <div class="stat-card"><div class="value">${data.week_reviews}</div><div class="label">本周复盘</div></div>
                 <div class="stat-card"><div class="value">${data.streak_days}🔥</div><div class="label">连续复盘天数</div></div>
+                <div class="stat-card"><div class="value">${data.win_rate}%</div><div class="label">胜率</div></div>
             </div>`;
 
         // PnL trend bar chart
