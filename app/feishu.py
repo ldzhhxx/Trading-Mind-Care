@@ -82,6 +82,19 @@ async def build_daily_message() -> tuple[str, str]:
 
     lines.append("\n---\n**🛑 防断手警示：严格执行计划，不要让情绪接管你的账户。**")
 
+    # Plan execution rate
+    db3 = await get_db()
+    try:
+        cursor = await db3.execute(
+            "SELECT COUNT(*) as total, SUM(done) as done FROM plans WHERE plan_type='today' AND trade_date >= date('now', '-7 days')"
+        )
+        pr = await cursor.fetchone()
+        if pr["total"] > 0:
+            rate = (pr["done"] or 0) / pr["total"] * 100
+            lines.append(f"\n📊 近7日计划执行率: **{rate:.0f}%**{'  ✅' if rate >= 80 else '  ⚠️ 需要提高！'}")
+    finally:
+        await db3.close()
+
     # Add streak info
     from datetime import timedelta
     db2 = await get_db()
