@@ -82,6 +82,11 @@ async def init_db():
         except Exception:
             pass  # column already exists
 
+        try:
+            await db.execute("ALTER TABLE reviews ADD COLUMN mood INTEGER")
+        except Exception:
+            pass  # column already exists
+
         # Insert defaults if not exist
         defaults = [
             ("base_url", "https://token-plan-cn.xiaomimimo.com/v1"),

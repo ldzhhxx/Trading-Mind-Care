@@ -215,6 +215,14 @@ async function deletePlan(id) {
 // --- Reviews ---
 let reviewPage = 0;
 const PAGE_SIZE = 10;
+let selectedMood = null;
+
+function selectMood(val) {
+    selectedMood = val;
+    document.querySelectorAll('.mood-btn').forEach(b => {
+        b.classList.toggle('selected', parseInt(b.dataset.mood) === val);
+    });
+}
 
 async function submitReview() {
     const btn = document.getElementById('submit-review');
@@ -224,6 +232,7 @@ async function submitReview() {
     const pnlVal = document.getElementById('pnl-input').value;
     const pnl = pnlVal ? parseFloat(pnlVal) : null;
     const trade_date = document.getElementById('review-date-input').value || null;
+    const mood = selectedMood;
 
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner"></span>AI 正在分析你的交易...';
@@ -237,7 +246,7 @@ async function submitReview() {
         const resp = await fetch('/api/reviews/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pnl, emotion_log: emotion, trade_date }),
+            body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood }),
         });
 
         const reader = resp.body.getReader();
@@ -267,6 +276,8 @@ async function submitReview() {
 
         document.getElementById('emotion-input').value = '';
         document.getElementById('pnl-input').value = '';
+        selectedMood = null;
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
         localStorage.removeItem('review_draft');
         loadReviews();
     } catch (e) {
@@ -274,7 +285,7 @@ async function submitReview() {
         box.className = 'critique-box warning-mode';
         // Fallback: submit without streaming
         try {
-            await api('/api/reviews', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion, trade_date }) });
+            await api('/api/reviews', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood }) });
             loadReviews();
         } catch (e2) { toast(e2.message, 'error'); }
     } finally {
@@ -492,7 +503,22 @@ async function loadStats() {
                     <span style="font-size:0.8rem;color:var(--text-dim)">${w.hit_count}次</span>
                 </div>`;
             }).join('');
-        } else {
+        }
+
+        // Mood-PnL correlation
+        if (data.mood_pnl_corr && data.mood_pnl_corr.length) {
+            const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
+            html += `<h3 style="margin:1.5rem 0 0.8rem">情绪-盈亏关联</h3>`;
+            html += `<div style="display:flex;gap:1rem;flex-wrap:wrap">`;
+            html += data.mood_pnl_corr.map(m => {
+                const avgPnl = m.avg_pnl || 0;
+                const cls = avgPnl >= 0 ? 'positive' : 'negative';
+                return `<div class="stat-card" style="min-width:80px"><div class="value">${moods[m.mood] || m.mood}</div><div class="label">平均盈亏</div><div class="${cls}" style="font-family:var(--font-mono);font-size:0.85rem;margin-top:0.2rem">${avgPnl >= 0 ? '+' : ''}${avgPnl.toFixed(1)}</div><div style="font-size:0.7rem;color:var(--text-dim)">${m.cnt}次</div></div>`;
+            }).join('');
+            html += `</div>`;
+        }
+
+        if (!data.top_weaknesses.length && !data.mood_pnl_corr?.length) {
             html += '<div class="empty-state"><div class="icon">📈</div><div class="msg">暂无统计数据</div></div>';
         }
 

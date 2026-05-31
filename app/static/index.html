@@ -66,6 +66,14 @@
                 <input type="date" id="review-date-input" style="background:var(--surface);border:1px solid var(--surface2);color:var(--text);padding:0.4rem 0.6rem;border-radius:var(--radius);font-size:0.9rem;width:auto">
                 <label>今日盈亏（可选）</label>
                 <input type="number" id="pnl-input" step="0.01" placeholder="正数为盈利，负数为亏损">
+                <label>交易时情绪状态</label>
+                <div class="mood-selector" id="mood-selector">
+                    <button type="button" class="mood-btn" data-mood="1" onclick="selectMood(1)" title="非常糟糕">😫</button>
+                    <button type="button" class="mood-btn" data-mood="2" onclick="selectMood(2)" title="不太好">😟</button>
+                    <button type="button" class="mood-btn" data-mood="3" onclick="selectMood(3)" title="一般">😐</button>
+                    <button type="button" class="mood-btn" data-mood="4" onclick="selectMood(4)" title="不错">🙂</button>
+                    <button type="button" class="mood-btn" data-mood="5" onclick="selectMood(5)" title="非常好">😄</button>
+                </div>
                 <label>交易倾诉</label>
                 <textarea id="emotion-input" rows="5" placeholder="今天交易中发生了什么？你的感受是什么？有没有违背计划的地方？"></textarea>
                 <button id="submit-review" onclick="submitReview()">提交复盘 — 接受拷打</button>

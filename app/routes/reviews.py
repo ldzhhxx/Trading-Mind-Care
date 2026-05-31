@@ -39,6 +39,7 @@ class ReviewCreate(BaseModel):
     trade_date: str | None = None
     pnl: float | None = None
     emotion_log: str
+    mood: int | None = None  # 1-5 scale: 1=very bad, 5=very good
 
     @field_validator("emotion_log")
     @classmethod
@@ -54,6 +55,13 @@ class ReviewCreate(BaseModel):
     def pnl_valid(cls, v):
         if v is not None and (math.isnan(v) or math.isinf(v)):
             raise ValueError("盈亏必须为有限数字")
+        return v
+
+    @field_validator("mood")
+    @classmethod
+    def mood_valid(cls, v):
+        if v is not None and (v < 1 or v > 5):
+            raise ValueError("情绪评分必须在 1-5 之间")
         return v
 
 
@@ -143,8 +151,8 @@ async def create_review(review: ReviewCreate):
             ai_critique = None
 
         cursor = await db.execute(
-            "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
-            (trade_date, review.pnl, review.emotion_log, ai_critique),
+            "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood) VALUES (?, ?, ?, ?, ?)",
+            (trade_date, review.pnl, review.emotion_log, ai_critique, review.mood),
         )
         review_id = cursor.lastrowid
         await db.commit()
@@ -216,8 +224,8 @@ async def create_review_stream(review: ReviewCreate):
             db2 = await get_db()
             try:
                 await db2.execute(
-                    "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
-                    (trade_date, review.pnl, review.emotion_log, None),
+                    "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood) VALUES (?, ?, ?, ?, ?)",
+                    (trade_date, review.pnl, review.emotion_log, None, review.mood),
                 )
                 await db2.commit()
             finally:
@@ -229,8 +237,8 @@ async def create_review_stream(review: ReviewCreate):
         db2 = await get_db()
         try:
             cursor = await db2.execute(
-                "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
-                (trade_date, review.pnl, review.emotion_log, full_critique),
+                "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood) VALUES (?, ?, ?, ?, ?)",
+                (trade_date, review.pnl, review.emotion_log, full_critique, review.mood),
             )
             review_id = cursor.lastrowid
             await db2.commit()

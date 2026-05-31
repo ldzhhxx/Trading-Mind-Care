@@ -87,6 +87,19 @@ async def get_stats():
         plan_done = pr["completed"] or 0
         plan_rate = (plan_done / plan_total * 100) if plan_total > 0 else 0
 
+        # Mood trend (last 14 days)
+        cursor = await db.execute(
+            "SELECT trade_date, AVG(mood) as avg_mood FROM reviews WHERE trade_date >= ? AND mood IS NOT NULL GROUP BY trade_date ORDER BY trade_date",
+            ((today - timedelta(days=13)).isoformat(),)
+        )
+        mood_trend = [{"trade_date": r["trade_date"], "avg_mood": round(r["avg_mood"], 1)} for r in await cursor.fetchall()]
+
+        # Mood-PnL correlation
+        cursor = await db.execute(
+            "SELECT mood, AVG(pnl) as avg_pnl, COUNT(*) as cnt FROM reviews WHERE mood IS NOT NULL AND pnl IS NOT NULL GROUP BY mood ORDER BY mood"
+        )
+        mood_pnl_corr = [dict(r) for r in await cursor.fetchall()]
+
         # Top weaknesses
         cursor = await db.execute(
             "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
@@ -115,6 +128,8 @@ async def get_stats():
             "plan_rate": round(plan_rate, 1),
             "top_weaknesses": top_weaknesses,
             "pnl_trend": pnl_trend,
+            "mood_trend": mood_trend,
+            "mood_pnl_corr": mood_pnl_corr,
         }
     finally:
         await db.close()

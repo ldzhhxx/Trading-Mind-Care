@@ -409,6 +409,21 @@ button.secondary:hover { background: #1a4a7a; }
 }
 .edit-inline:focus { outline: none; }
 
+/* Mood selector */
+.mood-selector { display: flex; gap: 0.5rem; margin-top: 0.3rem; }
+.mood-btn {
+    background: var(--surface);
+    border: 2px solid var(--surface2);
+    border-radius: var(--radius);
+    font-size: 1.5rem;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.6;
+}
+.mood-btn:hover { opacity: 1; transform: scale(1.1); border-color: var(--accent); }
+.mood-btn.selected { opacity: 1; border-color: var(--accent); background: rgba(233,69,96,0.15); transform: scale(1.1); }
+
 /* Responsive */
 @media (max-width: 700px) {
     .plans-grid { grid-template-columns: 1fr; }
