@@ -347,6 +347,27 @@ button.secondary:hover { background: #1a4a7a; }
 .section-header h2 { margin: 0; }
 .section-header h3 { margin: 0; font-size: 1rem; }
 
+/* PnL trend chart */
+.pnl-trend {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--surface2);
+    margin-bottom: 1rem;
+}
+.trend-bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+}
+.trend-bar { width: 100%; border-radius: 2px; min-height: 4px; }
+.trend-date { font-size: 0.6rem; color: var(--text-dim); margin-top: 3px; }
+
 /* Inline edit */
 .edit-inline {
     width: 100%;

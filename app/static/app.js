@@ -349,17 +349,42 @@ async function loadStats() {
         const data = await api('/api/stats');
         const el = document.getElementById('stats-content');
         const pnlClass = data.total_pnl >= 0 ? 'positive' : 'negative';
-        el.innerHTML = `
+        const weekClass = data.week_pnl >= 0 ? 'positive' : 'negative';
+        const monthClass = data.month_pnl >= 0 ? 'positive' : 'negative';
+
+        let html = `
             <div class="stats-grid">
                 <div class="stat-card"><div class="value">${data.review_count}</div><div class="label">总复盘次数</div></div>
                 <div class="stat-card"><div class="value ${pnlClass}">${data.total_pnl >= 0 ? '+' : ''}${data.total_pnl.toFixed(1)}</div><div class="label">累计盈亏</div></div>
+                <div class="stat-card"><div class="value ${weekClass}">${data.week_pnl >= 0 ? '+' : ''}${data.week_pnl.toFixed(1)}</div><div class="label">本周盈亏</div></div>
+                <div class="stat-card"><div class="value ${monthClass}">${data.month_pnl >= 0 ? '+' : ''}${data.month_pnl.toFixed(1)}</div><div class="label">本月盈亏</div></div>
                 <div class="stat-card"><div class="value">${data.week_reviews}</div><div class="label">本周复盘</div></div>
-                <div class="stat-card"><div class="value">${data.streak_days}</div><div class="label">连续复盘天数</div></div>
-            </div>
-            ${data.top_weaknesses.length ? `
-            <h3 style="margin:1.5rem 0 0.8rem">高频弱点 Top 5</h3>
-            ${data.top_weaknesses.map(w => {
-                const pct = Math.max(8, (w.weight / (data.top_weaknesses[0]?.weight || 1)) * 100);
+                <div class="stat-card"><div class="value">${data.streak_days}🔥</div><div class="label">连续复盘天数</div></div>
+            </div>`;
+
+        // PnL trend bar chart
+        if (data.pnl_trend && data.pnl_trend.length) {
+            const maxAbs = Math.max(...data.pnl_trend.map(d => Math.abs(d.daily_pnl || 0)), 1);
+            html += `<h3 style="margin:1.5rem 0 0.8rem">近 14 日盈亏趋势</h3>
+            <div class="pnl-trend">
+                ${data.pnl_trend.map(d => {
+                    const v = d.daily_pnl || 0;
+                    const h = Math.max(4, Math.abs(v) / maxAbs * 40);
+                    const color = v >= 0 ? 'var(--success)' : 'var(--danger)';
+                    const dir = v >= 0 ? 'bottom' : 'top';
+                    return `<div class="trend-bar-wrap" title="${d.trade_date}: ${v > 0 ? '+' : ''}${v.toFixed(1)}">
+                        <div class="trend-bar" style="height:${h}px;background:${color};align-self:${v >= 0 ? 'flex-end' : 'flex-start'}"></div>
+                        <span class="trend-date">${d.trade_date.slice(5)}</span>
+                    </div>`;
+                }).join('')}
+            </div>`;
+        }
+
+        // Top weaknesses by hit_count
+        if (data.top_weaknesses.length) {
+            html += `<h3 style="margin:1.5rem 0 0.8rem">高频弱点 Top 5（按触发次数）</h3>`;
+            html += data.top_weaknesses.map(w => {
+                const pct = Math.max(8, (w.hit_count / (data.top_weaknesses[0]?.hit_count || 1)) * 100);
                 return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
                     <span style="min-width:7rem;font-size:0.85rem">${esc(w.tag)}</span>
                     <div style="flex:1;background:var(--surface);border-radius:3px;height:10px;overflow:hidden">
@@ -367,8 +392,12 @@ async function loadStats() {
                     </div>
                     <span style="font-size:0.8rem;color:var(--text-dim)">${w.hit_count}次</span>
                 </div>`;
-            }).join('')}` : '<div class="empty-state"><div class="icon">📈</div><div class="msg">暂无统计数据</div></div>'}
-        `;
+            }).join('');
+        } else {
+            html += '<div class="empty-state"><div class="icon">📈</div><div class="msg">暂无统计数据</div></div>';
+        }
+
+        el.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
 }
 

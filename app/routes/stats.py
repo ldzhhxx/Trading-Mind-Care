@@ -13,6 +13,7 @@ async def get_stats():
     try:
         today = date.today()
         week_ago = (today - timedelta(days=7)).isoformat()
+        month_ago = (today - timedelta(days=30)).isoformat()
 
         # Total reviews & PnL
         cursor = await db.execute("SELECT COUNT(*) as cnt, COALESCE(SUM(pnl),0) as total FROM reviews")
@@ -20,11 +21,19 @@ async def get_stats():
         review_count = row["cnt"]
         total_pnl = row["total"]
 
-        # This week reviews
+        # This week reviews & PnL
         cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM reviews WHERE trade_date >= ?", (week_ago,)
+            "SELECT COUNT(*) as cnt, COALESCE(SUM(pnl),0) as total FROM reviews WHERE trade_date >= ?", (week_ago,)
         )
-        week_reviews = (await cursor.fetchone())["cnt"]
+        wr = await cursor.fetchone()
+        week_reviews = wr["cnt"]
+        week_pnl = wr["total"]
+
+        # This month PnL
+        cursor = await db.execute(
+            "SELECT COALESCE(SUM(pnl),0) as total FROM reviews WHERE trade_date >= ?", (month_ago,)
+        )
+        month_pnl = (await cursor.fetchone())["total"]
 
         # Streak: consecutive days with reviews ending today
         streak = 0
@@ -41,16 +50,26 @@ async def get_stats():
 
         # Top weaknesses
         cursor = await db.execute(
-            "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY weight DESC LIMIT 5"
+            "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
         )
         top_weaknesses = [dict(r) for r in await cursor.fetchall()]
+
+        # Daily PnL for last 14 days (for trend chart)
+        cursor = await db.execute(
+            "SELECT trade_date, SUM(pnl) as daily_pnl FROM reviews WHERE trade_date >= ? GROUP BY trade_date ORDER BY trade_date",
+            ((today - timedelta(days=13)).isoformat(),)
+        )
+        pnl_trend = [dict(r) for r in await cursor.fetchall()]
 
         return {
             "review_count": review_count,
             "total_pnl": float(total_pnl),
             "week_reviews": week_reviews,
+            "week_pnl": float(week_pnl),
+            "month_pnl": float(month_pnl),
             "streak_days": streak,
             "top_weaknesses": top_weaknesses,
+            "pnl_trend": pnl_trend,
         }
     finally:
         await db.close()
