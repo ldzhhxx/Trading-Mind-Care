@@ -10,7 +10,10 @@
     <header>
         <div style="display:flex;justify-content:space-between;align-items:center">
             <h1>🧠 Trading Mind Care</h1>
-            <button onclick="toggleTheme()" class="secondary" style="margin:0;padding:0.3rem 0.6rem;font-size:0.8rem" id="theme-btn">🌙</button>
+            <div style="display:flex;gap:0.4rem;align-items:center">
+                <button onclick="showShortcuts()" class="secondary" style="margin:0;padding:0.3rem 0.6rem;font-size:0.8rem" title="快捷键">⌨️</button>
+                <button onclick="toggleTheme()" class="secondary" style="margin:0;padding:0.3rem 0.6rem;font-size:0.8rem" id="theme-btn">🌙</button>
+            </div>
         </div>
         <nav>
             <button class="tab active" data-tab="plans">📋 计划</button>

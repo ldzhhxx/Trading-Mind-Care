@@ -923,7 +923,28 @@ document.addEventListener('keydown', e => {
         const tab = tabs[parseInt(e.key) - 1];
         document.querySelector(`[data-tab="${tab}"]`).click();
     }
+    if (e.key === '?') showShortcuts();
 });
+
+function showShortcuts() {
+    const existing = document.getElementById('shortcuts-modal');
+    if (existing) { existing.remove(); return; }
+    const modal = document.createElement('div');
+    modal.id = 'shortcuts-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center';
+    modal.innerHTML = `<div style="background:var(--surface);padding:1.5rem 2rem;border-radius:var(--radius);max-width:360px;width:90%">
+        <h3 style="margin-bottom:1rem">⌨️ 快捷键</h3>
+        <div style="font-size:0.85rem;line-height:2">
+            <div><kbd>1</kbd>-<kbd>7</kbd> 切换标签页</div>
+            <div><kbd>?</kbd> 显示/隐藏快捷键</div>
+            <div><kbd>Enter</kbd> 在计划输入框中提交</div>
+            <div><kbd>Esc</kbd> 取消编辑</div>
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()" style="margin-top:1rem;width:100%">关闭</button>
+    </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+}
 
 // --- Weekly Summary ---
 async function generateWeeklySummary() {
