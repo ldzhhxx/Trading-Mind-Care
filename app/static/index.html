@@ -115,8 +115,12 @@
         <section id="tab-matrix" class="tab-content">
             <div class="section-header">
                 <h2>弱点矩阵</h2>
-                <button class="secondary" onclick="exportMatrix()" style="margin:0;padding:0.3rem 0.8rem;font-size:0.8rem">导出 JSON</button>
+                <div style="display:flex;gap:0.4rem">
+                    <button class="secondary" onclick="analyzeMatrix()" id="analyze-btn" style="margin:0;padding:0.3rem 0.8rem;font-size:0.8rem">🤖 AI 分析</button>
+                    <button class="secondary" onclick="exportMatrix()" style="margin:0;padding:0.3rem 0.8rem;font-size:0.8rem">导出 JSON</button>
+                </div>
             </div>
+            <div id="matrix-analysis" class="critique-box" style="display:none;margin-bottom:1rem"></div>
             <p class="hint">权重越高，说明该弱点近期越活跃。系统每日自动衰减未触发的弱点。</p>
             <div class="add-vuln-form" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
                 <input id="vuln-tag-input" placeholder="弱点标签" style="flex:1;min-width:120px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">

@@ -607,6 +607,38 @@ async function exportMatrix() {
     } catch (e) { toast(e.message, 'error'); }
 }
 
+async function analyzeMatrix() {
+    const btn = document.getElementById('analyze-btn');
+    const box = document.getElementById('matrix-analysis');
+    btn.disabled = true;
+    btn.textContent = '分析中...';
+    box.style.display = 'block';
+    box.textContent = '';
+    try {
+        const res = await fetch('/api/vulnerabilities/analyze', { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+                try {
+                    const payload = JSON.parse(line.slice(6));
+                    if (payload.chunk) box.textContent += payload.chunk;
+                    if (payload.error) box.textContent = 'AI 暂不可用: ' + payload.error;
+                } catch(e) {}
+            }
+        }
+    } catch (e) { box.textContent = '分析失败: ' + e.message; }
+    btn.disabled = false;
+    btn.textContent = '🤖 AI 分析';
+}
+
 // --- Stats ---
 async function loadStats() {
     try {

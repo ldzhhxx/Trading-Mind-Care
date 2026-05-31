@@ -134,3 +134,49 @@ async def reset_vulnerability(vuln_id: int):
         return {"ok": True}
     finally:
         await db.close()
+
+
+@router.post("/analyze")
+async def analyze_vulnerabilities():
+    """AI analysis of vulnerability patterns - returns streaming response."""
+    import json
+    from fastapi.responses import StreamingResponse
+    from app.llm import call_llm_stream
+
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT tag, weight, hit_count, last_hit_at, description FROM vulnerability_matrix ORDER BY weight DESC"
+        )
+        vulns = [dict(r) for r in await cursor.fetchall()]
+        if not vulns:
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "暂无弱点数据"})
+    finally:
+        await db.close()
+
+    vulns_text = "\n".join(
+        f"- {v['tag']} (权重{v['weight']:.2f}, 触发{v['hit_count']}次, 最近{v['last_hit_at'] or '未知'})"
+        for v in vulns
+    )
+
+    messages = [
+        {"role": "system", "content": """你是一个交易心理分析师。分析交易员的弱点矩阵数据，找出：
+1. 弱点之间的关联模式（哪些弱点经常一起出现）
+2. 最危险的弱点组合
+3. 改善建议的优先级排序
+4. 一个具体的30天改善计划
+
+简洁有力，200字以内。"""},
+        {"role": "user", "content": f"弱点矩阵数据：\n{vulns_text}"},
+    ]
+
+    async def stream():
+        try:
+            async for chunk in call_llm_stream(messages):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
