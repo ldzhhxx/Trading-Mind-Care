@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.database import init_db
 from app.scheduler import start_scheduler, daily_decay
@@ -33,6 +34,23 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Trading Mind Care", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    errors = exc.errors()
+    msg = "; ".join(e.get("msg", "验证错误") for e in errors)
+    return JSONResponse(status_code=422, content={"detail": msg})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误，请稍后重试"})
 
 # Routes
 app.include_router(plans.router)
