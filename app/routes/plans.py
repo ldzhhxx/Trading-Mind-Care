@@ -100,8 +100,20 @@ async def update_plan(plan_id: int, plan: PlanUpdate):
 async def toggle_plan_done(plan_id: int):
     db = await get_db()
     try:
-        await db.execute("UPDATE plans SET done = 1 - done WHERE id = ?", (plan_id,))
+        cursor = await db.execute("SELECT done, trade_date FROM plans WHERE id = ?", (plan_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="计划不存在")
+        new_done = 1 - row["done"]
+        await db.execute("UPDATE plans SET done = ? WHERE id = ?", (new_done, plan_id))
         await db.commit()
+        # Grant XP for completing a plan
+        if new_done == 1:
+            try:
+                from app.routes.discipline import _add_xp
+                await _add_xp(db, "plan_complete", 5, row["trade_date"])
+            except Exception:
+                pass
         return {"ok": True}
     finally:
         await db.close()

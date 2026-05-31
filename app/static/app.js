@@ -501,10 +501,12 @@ async function toggleReviewDetail(el, id) {
             const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
             html += `<div class="detail-section"><strong>情绪：</strong> ${moods[r.mood]} (${r.mood}/5)</div>`;
         }
-        html += `<div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+        html += `<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">
             <button class="secondary" onclick="event.stopPropagation();recritiqueReview(${id}, this)" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem">🔄 重新拷打</button>
+            <button class="secondary" onclick="event.stopPropagation();aiFollowup(${id}, this)" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem">🤔 AI 追问</button>
             <button class="secondary" onclick="event.stopPropagation();deleteReview(${id})" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem;color:var(--danger)">🗑️ 删除</button>
-        </div>`;
+        </div>
+        <div id="followup-${id}" style="display:none;margin-top:0.5rem"></div>`;
         detail.innerHTML = html;
         detail.dataset.loaded = '1';
     } catch (e) { detail.innerHTML = '<em>加载失败</em>'; }
@@ -565,6 +567,31 @@ async function recritiqueReview(id, btn) {
     }
     btn.disabled = false;
     btn.textContent = '🔄 重新拷打';
+}
+
+async function aiFollowup(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '思考中...';
+    const box = document.getElementById(`followup-${id}`);
+    box.style.display = 'block';
+    box.innerHTML = '<em style="color:var(--text-dim)">AI 正在生成追问...</em>';
+    try {
+        const data = await api(`/api/reviews/${id}/followup`, { method: 'POST' });
+        if (data.questions && data.questions.length) {
+            box.innerHTML = data.questions.map((q, i) =>
+                `<div style="padding:0.4rem 0.6rem;margin:0.3rem 0;background:var(--surface);border-radius:var(--radius);border-left:3px solid var(--accent)">
+                    <div style="font-size:0.85rem;font-weight:500">🤔 ${q.question}</div>
+                    <div style="font-size:0.75rem;color:var(--text-dim);margin-top:0.2rem">${q.intent}</div>
+                </div>`
+            ).join('');
+        } else {
+            box.innerHTML = '<em style="color:var(--text-dim)">暂无追问</em>';
+        }
+    } catch (e) {
+        box.innerHTML = `<em style="color:var(--danger)">失败: ${e.message}</em>`;
+    }
+    btn.disabled = false;
+    btn.textContent = '🤔 AI 追问';
 }
 
 // --- Matrix ---
@@ -1601,6 +1628,27 @@ async function loadAnalytics(type) {
             } else {
                 html += `<p style="color:var(--text-dim)">${data.message || '弱点数据不足，需要更多复盘记录'}</p>`;
             }
+        } else if (type === 'heatmap') {
+            data = await api('/api/analytics/emotion-heatmap');
+            html = `<h3>🌡️ 情绪热力图（近90天）</h3>`;
+            if (data.data.length) {
+                const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
+                const moodColors = ['', '#e74c3c', '#e67e22', '#f39c12', '#27ae60', '#2ecc71'];
+                html += `<div style="display:flex;flex-wrap:wrap;gap:3px;margin:1rem 0">`;
+                html += data.data.map(d => {
+                    const color = moodColors[d.mood] || '#555';
+                    const pnlText = d.pnl != null ? ` PnL:${d.pnl > 0 ? '+' : ''}${d.pnl.toFixed(0)}` : '';
+                    return `<div style="width:28px;height:28px;background:${color};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;cursor:default;opacity:0.85" title="${d.date} ${moods[d.mood]}${pnlText}">${moods[d.mood]}</div>`;
+                }).join('');
+                html += `</div>`;
+                html += `<div style="display:flex;gap:0.8rem;font-size:0.75rem;color:var(--text-dim);margin-top:0.5rem">`;
+                for (let i = 1; i <= 5; i++) {
+                    html += `<span>${moods[i]} = ${i}/5</span>`;
+                }
+                html += `</div>`;
+            } else {
+                html += `<p style="color:var(--text-dim)">暂无情绪数据</p>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
@@ -1615,6 +1663,7 @@ async function aiAnalytics(type) {
         'danger': '/api/analytics/ai-danger-signals',
         'weakness-deep': '/api/analytics/ai-weakness-deep',
         'behavior': '/api/analytics/ai-behavior-patterns',
+        'premarket': '/api/analytics/ai-premarket',
     };
     try {
         const res = await fetch(endpoints[type], { method: 'POST' });
@@ -1701,14 +1750,49 @@ async function aiGenerateRules() {
 // --- Habits & Goals ---
 async function loadHabits() {
     try {
-        const [streaks, goals] = await Promise.all([
+        const [streaks, goals, level, violations] = await Promise.all([
             api('/api/goals/streaks'),
             api('/api/goals?month=' + new Date().toISOString().slice(0,7)),
+            api('/api/discipline/level'),
+            api('/api/discipline/violations/stats'),
         ]);
         renderStreaks(streaks);
         renderGoals(goals);
         renderMilestones(streaks);
+        renderTraderLevel(level);
+        renderViolations(violations);
     } catch(e) { toast(e.message, 'error'); }
+}
+
+function renderTraderLevel(lv) {
+    const panel = document.getElementById('trader-level-panel');
+    const progressBar = lv.progress ? `<div style="margin-top:0.5rem;background:var(--surface2);border-radius:4px;height:8px;overflow:hidden"><div style="width:${lv.progress}%;height:100%;background:var(--accent);border-radius:4px;transition:width 0.3s"></div></div>` : '';
+    const nextInfo = lv.next_level ? `<span style="font-size:0.75rem;color:var(--text-dim)">下一级: ${lv.next_level} (${lv.next_threshold} XP)</span>` : '<span style="font-size:0.75rem;color:var(--accent)">已满级!</span>';
+    panel.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><span style="font-size:1.5rem">${lv.level_icon}</span> <strong>${lv.level_name}</strong></div>
+            <div style="text-align:right"><span style="font-size:1.2rem;font-weight:bold;color:var(--accent)">${lv.total_xp} XP</span><br>${nextInfo}</div>
+        </div>
+        ${progressBar}
+        ${lv.today_xp ? `<div style="margin-top:0.4rem;font-size:0.8rem;color:var(--success)">今日 +${lv.today_xp} XP</div>` : ''}
+    `;
+}
+
+function renderViolations(stats) {
+    const panel = document.getElementById('violations-panel');
+    if (!stats.total) {
+        panel.innerHTML = '<p style="color:var(--text-dim);font-size:0.85rem">暂无违规记录 — 继续保持纪律！</p>';
+        return;
+    }
+    const trend = stats.weekly_trend.map(w => `<span style="display:inline-block;width:20px;height:${Math.max(4, w.count * 8)}px;background:${w.count > 2 ? 'var(--danger)' : w.count > 0 ? 'var(--warning)' : 'var(--success)'};border-radius:2px;margin:0 1px;vertical-align:bottom" title="${w.week}: ${w.count}次"></span>`).join('');
+    const topRules = stats.top_violated_rules.map(r => `<div style="font-size:0.8rem;padding:0.2rem 0;color:var(--text-dim)">• ${r.rule_text} <span style="color:var(--danger)">(${r.cnt}次)</span></div>`).join('');
+    panel.innerHTML = `
+        <div style="display:flex;gap:1rem;margin-bottom:0.8rem;flex-wrap:wrap">
+            <div><strong style="color:var(--danger)">${stats.total}</strong> <span style="font-size:0.8rem;color:var(--text-dim)">总违规</span></div>
+            <div style="display:flex;align-items:flex-end;gap:1px">${trend}</div>
+        </div>
+        ${topRules ? `<div style="margin-top:0.5rem"><strong style="font-size:0.85rem">高频违规:</strong>${topRules}</div>` : ''}
+    `;
 }
 
 function renderStreaks(s) {

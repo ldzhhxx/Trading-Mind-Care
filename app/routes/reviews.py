@@ -382,6 +382,19 @@ async def create_review_stream(review: ReviewCreate):
         except Exception:
             pass
 
+        # Grant XP for completing a review
+        try:
+            from app.routes.discipline import _add_xp
+            db4 = await get_db()
+            try:
+                await _add_xp(db4, "review_complete", 15, trade_date)
+                if streak in {7, 14, 30, 60}:
+                    await _add_xp(db4, f"milestone_{streak}d", streak * 5, trade_date)
+            finally:
+                await db4.close()
+        except Exception:
+            pass
+
         yield f"data: {json.dumps({'done': True, 'review_id': review_id})}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -458,6 +471,45 @@ async def _extract_weaknesses(db, emotion_log: str, critique: str) -> list[str]:
     return tags
 
 
+@router.post("/{review_id}/followup")
+async def ai_followup(review_id: int):
+    """AI generates follow-up questions to deepen reflection."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM reviews WHERE id = ?", (review_id,))
+        review = await cursor.fetchone()
+        if not review:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="复盘不存在")
+    finally:
+        await db.close()
+
+    messages = [
+        {"role": "system", "content": """你是交易心理教练。根据交易员的复盘内容，提出3个追问来引导更深入的反思。
+追问要：1.具体而非泛泛 2.指向行为背后的心理动因 3.帮助交易员发现自己没意识到的模式
+返回严格JSON数组，每个元素：{"question": "追问内容", "intent": "这个问题想引导什么反思"}
+只返回JSON。"""},
+        {"role": "user", "content": f"盈亏: {review['pnl']}\n复盘: {review['emotion_log'][:500]}\nAI点评: {(review['ai_critique'] or '')[:300]}"},
+    ]
+
+    try:
+        raw = await call_llm(messages)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
+        questions = json.loads(raw)
+        # Save to review
+        db2 = await get_db()
+        try:
+            await db2.execute("UPDATE reviews SET followup = ? WHERE id = ?", (json.dumps(questions, ensure_ascii=False), review_id))
+            await db2.commit()
+        finally:
+            await db2.close()
+        return {"questions": questions if isinstance(questions, list) else []}
+    except Exception:
+        return {"questions": []}
+
+
 @router.post("/check-rules")
 async def check_rules_violation(content: dict):
     """AI 自动检测复盘内容是否违反了交易纪律."""
@@ -502,8 +554,10 @@ async def check_rules_violation(content: dict):
         if not isinstance(violations, list):
             return {"violations": []}
 
-        # Enrich with rule details
+        # Enrich with rule details and auto-record violations
         result = []
+        trade_date = content.get("trade_date") or date.today().isoformat()
+        review_id = content.get("review_id")
         for v in violations:
             if v.get("violated"):
                 idx = v.get("rule_index", 0) - 1
@@ -513,6 +567,19 @@ async def check_rules_violation(content: dict):
                         "category": rules[idx]["category"],
                         "evidence": v.get("evidence", ""),
                     })
+                    # Auto-record violation
+                    try:
+                        db2 = await get_db()
+                        try:
+                            await db2.execute(
+                                "INSERT INTO discipline_violations (trade_date, rule_id, rule_text, category, evidence, review_id) VALUES (?, ?, ?, ?, ?, ?)",
+                                (trade_date, rules[idx]["id"], rules[idx]["rule"], rules[idx]["category"], v.get("evidence", ""), review_id),
+                            )
+                            await db2.commit()
+                        finally:
+                            await db2.close()
+                    except Exception:
+                        pass
         return {"violations": result}
     except Exception:
         return {"violations": []}

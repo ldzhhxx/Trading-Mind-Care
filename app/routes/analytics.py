@@ -968,3 +968,116 @@ async def performance_summary():
         "top_weakness": top_vuln["tag"] if top_vuln else None,
         "top_weakness_weight": round(top_vuln["weight"], 1) if top_vuln else 0,
     }
+
+
+@router.get("/emotion-heatmap")
+async def emotion_heatmap():
+    """情绪热力图 — 按日期和时段展示情绪分布."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, mood, pnl FROM reviews WHERE mood IS NOT NULL ORDER BY trade_date DESC LIMIT 90"
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    # Build heatmap data: date -> mood
+    heatmap = []
+    for r in rows:
+        heatmap.append({
+            "date": r["trade_date"],
+            "mood": r["mood"],
+            "pnl": r["pnl"],
+        })
+
+    return {"data": heatmap}
+
+
+@router.get("/review-compare")
+async def review_compare(id1: int, id2: int):
+    """对比两次复盘的差异."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM reviews WHERE id IN (?, ?)", (id1, id2))
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if len(rows) < 2:
+        return {"error": "需要两条有效的复盘记录"}
+
+    r1 = rows[0] if rows[0]["id"] == id1 else rows[1]
+    r2 = rows[1] if rows[1]["id"] == id2 else rows[0]
+
+    return {
+        "review1": {"id": r1["id"], "date": r1["trade_date"], "pnl": r1["pnl"], "mood": r1["mood"], "emotion_log": r1["emotion_log"][:200], "score": r1.get("score")},
+        "review2": {"id": r2["id"], "date": r2["trade_date"], "pnl": r2["pnl"], "mood": r2["mood"], "emotion_log": r2["emotion_log"][:200], "score": r2.get("score")},
+        "comparison": {
+            "pnl_change": (r2["pnl"] or 0) - (r1["pnl"] or 0),
+            "mood_change": (r2["mood"] or 3) - (r1["mood"] or 3),
+            "score_change": (r2.get("score") or 0) - (r1.get("score") or 0),
+        },
+    }
+
+
+@router.post("/ai-premarket")
+async def ai_premarket_reminder():
+    """AI 盘前提醒 — 基于历史数据生成今日交易注意事项."""
+    today = date.today()
+    dow = today.weekday()
+    db = await get_db()
+    try:
+        # Same weekday history
+        cursor = await db.execute(
+            "SELECT trade_date, pnl, mood FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date DESC LIMIT 30"
+        )
+        recent = [dict(r) for r in await cursor.fetchall()]
+        same_dow = [r for r in recent if date.fromisoformat(r["trade_date"]).weekday() == dow]
+
+        # Active high-weight vulnerabilities
+        cursor = await db.execute(
+            "SELECT tag, weight FROM vulnerability_matrix WHERE weight >= 1.5 ORDER BY weight DESC LIMIT 5"
+        )
+        vulns = [dict(r) for r in await cursor.fetchall()]
+
+        # Recent violations
+        cursor = await db.execute(
+            "SELECT rule_text, COUNT(*) as cnt FROM discipline_violations GROUP BY rule_text ORDER BY cnt DESC LIMIT 3"
+        )
+        top_violations = [dict(r) for r in await cursor.fetchall()]
+
+        # Today's plans
+        cursor = await db.execute(
+            "SELECT content FROM plans WHERE trade_date = ? AND plan_type='today'", (today.isoformat(),)
+        )
+        plans = [r["content"] for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    dow_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    same_dow_pnl = sum(r["pnl"] for r in same_dow) / len(same_dow) if same_dow else 0
+
+    user_msg = f"""今天是{dow_names[dow]}。
+【{dow_names[dow]}历史表现】{len(same_dow)}次交易，平均盈亏{same_dow_pnl:.1f}
+【活跃弱点】{', '.join(f"{v['tag']}({v['weight']:.1f})" for v in vulns) or '无'}
+【高频违规】{', '.join(f"{v['rule_text']}({v['cnt']}次)" for v in top_violations) or '无'}
+【今日计划】{'; '.join(plans[:3]) or '未制定'}
+【近期盈亏】{', '.join(f"{r['pnl']:+.0f}" for r in recent[:5])}
+
+请生成今日盘前提醒：1.今天最需要注意什么 2.基于历史数据的具体风险 3.一句话核心纪律提醒。150字以内。"""
+
+    messages = [
+        {"role": "system", "content": "你是交易心理教练，擅长基于数据生成个性化的盘前提醒。简洁、具体、可操作。"},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async def stream():
+        try:
+            async for chunk in call_llm_stream(messages):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")

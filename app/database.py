@@ -181,6 +181,29 @@ async def _run_migrations(db):
         (15, "ALTER TABLE reviews ADD COLUMN score INTEGER"),
         # Migration 16: Plan tags (v8.0)
         (16, "ALTER TABLE plans ADD COLUMN tags TEXT NOT NULL DEFAULT ''"),
+        # Migration 17: Discipline violations table (v9.0)
+        (17, """CREATE TABLE IF NOT EXISTS discipline_violations (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            trade_date  TEXT NOT NULL,
+            rule_id     INTEGER,
+            rule_text   TEXT NOT NULL,
+            category    TEXT NOT NULL DEFAULT 'general',
+            evidence    TEXT NOT NULL DEFAULT '',
+            review_id   INTEGER,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )"""),
+        (18, "CREATE INDEX IF NOT EXISTS idx_violations_date ON discipline_violations(trade_date)"),
+        # Migration 19: Trader level system (v9.0)
+        (19, """CREATE TABLE IF NOT EXISTS trader_xp (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            action      TEXT NOT NULL,
+            xp          INTEGER NOT NULL,
+            trade_date  TEXT NOT NULL,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )"""),
+        (20, "CREATE INDEX IF NOT EXISTS idx_xp_date ON trader_xp(trade_date)"),
+        # Migration 21: Review follow-up questions (v9.0)
+        (21, "ALTER TABLE reviews ADD COLUMN followup TEXT"),
     ]
 
     for version, sql in migrations:

@@ -272,6 +272,7 @@
                 <button onclick="loadAnalytics('evolution')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">风格演变</button>
                 <button onclick="loadAnalytics('mood-trend')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">情绪趋势</button>
                 <button onclick="loadAnalytics('correlation')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🕸️ 弱点关联</button>
+                <button onclick="loadAnalytics('heatmap')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🌡️ 情绪热力图</button>
             </div>
             <div id="analytics-content"></div>
             <div style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">
@@ -281,6 +282,7 @@
                     <button onclick="aiAnalytics('danger')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">⚠️ 危险信号</button>
                     <button onclick="aiAnalytics('weakness-deep')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🧬 弱点关联</button>
                     <button onclick="aiAnalytics('behavior')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🧠 行为模式</button>
+                    <button onclick="aiAnalytics('premarket')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🌅 盘前提醒</button>
                 </div>
                 <div id="ai-analytics-result" class="critique-box" style="display:none"></div>
             </div>
@@ -289,6 +291,7 @@
         <!-- Habits Tab -->
         <section id="tab-habits" class="tab-content">
             <h2 style="margin-bottom:1rem">🎯 习惯追踪 & 目标设定</h2>
+            <div id="trader-level-panel" style="margin-bottom:1.5rem;padding:1rem;background:var(--surface);border-radius:var(--radius);border:1px solid var(--surface2)"></div>
             <div id="streaks-panel" class="stats-grid" style="margin-bottom:2rem"></div>
             <div style="border-top:1px solid var(--surface2);padding-top:1.5rem">
                 <h3 style="margin-bottom:0.8rem">📌 月度目标</h3>
@@ -297,6 +300,10 @@
                     <button onclick="addGoal()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">+ 添加目标</button>
                 </div>
                 <div id="goals-list"></div>
+            </div>
+            <div style="border-top:1px solid var(--surface2);padding-top:1.5rem;margin-top:1.5rem">
+                <h3 style="margin-bottom:0.8rem">📏 纪律违反记录</h3>
+                <div id="violations-panel"></div>
             </div>
             <div style="border-top:1px solid var(--surface2);padding-top:1.5rem;margin-top:1.5rem">
                 <h3 style="margin-bottom:0.8rem">🏆 里程碑</h3>
