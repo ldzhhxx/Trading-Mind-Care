@@ -1112,16 +1112,43 @@ function showShortcuts() {
     modal.innerHTML = `<div style="background:var(--surface);padding:1.5rem 2rem;border-radius:var(--radius);max-width:360px;width:90%">
         <h3 style="margin-bottom:1rem">⌨️ 快捷键</h3>
         <div style="font-size:0.85rem;line-height:2">
-            <div><kbd>1</kbd>-<kbd>7</kbd> 切换标签页</div>
+            <div><kbd>1</kbd>-<kbd>9</kbd> 切换标签页</div>
             <div><kbd>?</kbd> 显示/隐藏快捷键</div>
-            <div><kbd>Enter</kbd> 在计划输入框中提交</div>
-            <div><kbd>Esc</kbd> 取消编辑</div>
+            <div><kbd>T</kbd> 切换主题</div>
+            <div><kbd>N</kbd> 新建计划（跳到计划页）</div>
+            <div><kbd>R</kbd> 跳到复盘页</div>
+            <div><kbd>Esc</kbd> 关闭弹窗</div>
         </div>
         <button onclick="this.parentElement.parentElement.remove()" style="margin-top:1rem;width:100%">关闭</button>
     </div>`;
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     document.body.appendChild(modal);
 }
+
+// Global keyboard shortcuts
+document.addEventListener('keydown', e => {
+    // Skip if user is typing in an input/textarea
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    const tabs = document.querySelectorAll('.tab');
+    if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key) - 1;
+        if (tabs[idx]) tabs[idx].click();
+    } else if (e.key === '?') {
+        showShortcuts();
+    } else if (e.key === 't' || e.key === 'T') {
+        toggleTheme();
+    } else if (e.key === 'n' || e.key === 'N') {
+        tabs[0]?.click(); // Plans tab
+        setTimeout(() => document.getElementById('today-input')?.focus(), 100);
+    } else if (e.key === 'r' || e.key === 'R') {
+        tabs[1]?.click(); // Review tab
+    } else if (e.key === 'Escape') {
+        const modal = document.getElementById('shortcuts-modal');
+        if (modal) modal.remove();
+    }
+});
 
 // --- Weekly Summary ---
 async function generateWeeklySummary() {
