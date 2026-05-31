@@ -472,14 +472,24 @@ body.focus-mode #review-pagination { display: none; }
     .plans-grid { grid-template-columns: 1fr; }
     main { padding: 1rem; }
     header { padding: 0.8rem 1rem; }
-    nav { gap: 0.3rem; }
-    .tab { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
+    nav { gap: 0.3rem; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 0.3rem; -webkit-overflow-scrolling: touch; }
+    nav::-webkit-scrollbar { height: 3px; }
+    nav::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+    .tab { padding: 0.4rem 0.7rem; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .settings-section { max-width: 100%; }
+    .review-form textarea { font-size: 16px; } /* Prevent iOS zoom */
+    .section-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    #coach-messages { max-height: 40vh; }
+    .analytics-actions { gap: 0.3rem !important; }
+    .analytics-actions button { padding: 0.3rem 0.6rem !important; font-size: 0.75rem !important; }
 }
 
 @media (max-width: 400px) {
     .stats-grid { grid-template-columns: 1fr; }
+    .tab { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+    h1 { font-size: 1.1rem; }
+    h2 { font-size: 1rem; }
 }
 
 /* Calendar */
