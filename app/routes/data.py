@@ -166,17 +166,24 @@ async def export_all():
         config = {r["key"]: r["value"] for r in await cursor.fetchall()}
         cursor = await db.execute("SELECT * FROM goals ORDER BY created_at DESC")
         goals = [dict(r) for r in await cursor.fetchall()]
+        # v8.0: review templates
+        try:
+            cursor = await db.execute("SELECT * FROM review_templates ORDER BY id DESC")
+            review_templates = [dict(r) for r in await cursor.fetchall()]
+        except Exception:
+            review_templates = []
     finally:
         await db.close()
 
     from datetime import date as d
     export = {
         "export_date": d.today().isoformat(),
-        "version": "4.0",
+        "version": "5.0",
         "reviews": reviews,
         "plans": plans,
         "vulnerability_matrix": vulns,
         "plan_templates": templates,
+        "review_templates": review_templates,
         "trade_rules": rules,
         "journal": journal,
         "goals": goals,
