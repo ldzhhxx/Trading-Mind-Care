@@ -1546,6 +1546,47 @@ async function loadAnalytics(type) {
             } else {
                 html += `<p style="color:var(--text-dim)">暂无情绪数据，请在复盘时选择情绪状态</p>`;
             }
+        } else if (type === 'correlation') {
+            data = await api('/api/analytics/weakness-correlation');
+            html = `<h3>🕸️ 弱点关联图谱</h3>`;
+            if (data.nodes.length >= 2 && data.edges.length) {
+                html += `<p class="hint" style="margin-bottom:1rem">弱点之间的连线表示它们经常一起出现，线越粗关联越强</p>`;
+                // SVG force-directed-like layout (simple circular)
+                const size = 320, cx = size/2, cy = size/2, r = 110;
+                const nodes = data.nodes.slice(0, 10);
+                const positions = {};
+                nodes.forEach((n, i) => {
+                    const angle = (Math.PI * 2 * i / nodes.length) - Math.PI / 2;
+                    positions[n.id] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+                });
+                const maxStrength = Math.max(...data.edges.map(e => e.strength), 1);
+                let svgEdges = data.edges.map(e => {
+                    const s = positions[e.source], t = positions[e.target];
+                    if (!s || !t) return '';
+                    const w = Math.max(1, (e.strength / maxStrength) * 4);
+                    return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="var(--accent)" stroke-width="${w}" opacity="0.5"/>`;
+                }).join('');
+                let svgNodes = nodes.map(n => {
+                    const p = positions[n.id];
+                    const radius = Math.max(6, Math.min(16, n.weight * 3));
+                    return `<circle cx="${p.x}" cy="${p.y}" r="${radius}" fill="var(--accent)" opacity="0.7"/>
+                        <text x="${p.x}" y="${p.y + radius + 12}" text-anchor="middle" fill="var(--text)" font-size="9">${n.id.slice(0,5)}</text>`;
+                }).join('');
+                html += `<div style="text-align:center"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${svgEdges}${svgNodes}</svg></div>`;
+                // Edge list
+                html += `<h4 style="margin-top:1rem">关联强度排名</h4><div style="font-size:0.85rem">`;
+                html += data.edges.slice(0, 8).map(e => {
+                    const pct = (e.strength / maxStrength) * 100;
+                    return `<div style="display:flex;align-items:center;gap:0.5rem;margin:0.3rem 0">
+                        <span style="min-width:12rem">${e.source} ↔ ${e.target}</span>
+                        <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px"><div style="width:${pct}%;height:100%;background:var(--accent);border-radius:3px"></div></div>
+                        <span style="font-size:0.75rem;color:var(--text-dim)">${e.strength}次</span>
+                    </div>`;
+                }).join('');
+                html += `</div>`;
+            } else {
+                html += `<p style="color:var(--text-dim)">${data.message || '弱点数据不足，需要更多复盘记录'}</p>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
