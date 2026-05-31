@@ -807,7 +807,69 @@ async function loadStats() {
             }
             if (extraHtml) el.innerHTML += extraHtml;
         } catch(e) {}
+
+        // Plan execution rate gauge
+        const gaugeHtml = buildGauge(data.plan_rate, '计划执行率');
+        el.innerHTML += `<h3 style="margin:1.5rem 0 0.8rem">📏 计划执行率仪表盘</h3>${gaugeHtml}`;
+
+        // Weakness radar chart (CSS-based)
+        if (data.top_weaknesses && data.top_weaknesses.length >= 3) {
+            el.innerHTML += `<h3 style="margin:1.5rem 0 0.8rem">🕸️ 弱点雷达图</h3>` + buildRadar(data.top_weaknesses);
+        }
     } catch (e) { toast(e.message, 'error'); }
+}
+
+function buildGauge(value, label) {
+    const angle = (value / 100) * 180;
+    const color = value >= 80 ? 'var(--success)' : value >= 50 ? 'var(--accent)' : 'var(--danger)';
+    return `<div style="text-align:center;margin:1rem 0">
+        <div style="position:relative;width:160px;height:80px;margin:0 auto;overflow:hidden">
+            <div style="position:absolute;width:160px;height:160px;border-radius:50%;border:12px solid var(--surface2);border-bottom-color:transparent;border-right-color:transparent;transform:rotate(225deg);top:0"></div>
+            <div style="position:absolute;width:160px;height:160px;border-radius:50%;border:12px solid ${color};border-bottom-color:transparent;border-right-color:transparent;transform:rotate(${225 + angle * 0.75}deg);top:0;clip-path:inset(0 0 50% 0);transition:transform 0.5s"></div>
+            <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);font-size:1.5rem;font-weight:700;color:${color}">${value}%</div>
+        </div>
+        <div style="font-size:0.85rem;color:var(--text-dim);margin-top:0.3rem">${label}</div>
+    </div>`;
+}
+
+function buildRadar(weaknesses) {
+    const n = Math.min(weaknesses.length, 5);
+    const items = weaknesses.slice(0, n);
+    const maxWeight = Math.max(...items.map(w => w.weight), 1);
+    const size = 200;
+    const cx = size / 2, cy = size / 2, r = 70;
+
+    // Generate polygon points
+    const points = items.map((w, i) => {
+        const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+        const ratio = Math.min(w.weight / maxWeight, 1);
+        const x = cx + r * ratio * Math.cos(angle);
+        const y = cy + r * ratio * Math.sin(angle);
+        return `${x},${y}`;
+    }).join(' ');
+
+    // Background rings
+    const rings = [0.25, 0.5, 0.75, 1].map(ratio => {
+        const ringPts = items.map((_, i) => {
+            const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+            return `${cx + r * ratio * Math.cos(angle)},${cy + r * ratio * Math.sin(angle)}`;
+        }).join(' ');
+        return `<polygon points="${ringPts}" fill="none" stroke="var(--surface2)" stroke-width="0.5"/>`;
+    }).join('');
+
+    // Labels
+    const labels = items.map((w, i) => {
+        const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
+        const lx = cx + (r + 25) * Math.cos(angle);
+        const ly = cy + (r + 25) * Math.sin(angle);
+        return `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="var(--text-dim)" font-size="10">${w.tag.slice(0,4)}</text>`;
+    }).join('');
+
+    return `<div style="text-align:center"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        ${rings}
+        <polygon points="${points}" fill="rgba(99,102,241,0.2)" stroke="var(--accent)" stroke-width="2"/>
+        ${labels}
+    </svg></div>`;
 }
 
 // --- Daily Report ---
