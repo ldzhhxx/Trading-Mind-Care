@@ -164,19 +164,22 @@ async def export_all():
         journal = [dict(r) for r in await cursor.fetchall()]
         cursor = await db.execute("SELECT key, value FROM sys_config WHERE key NOT IN ('api_key')")
         config = {r["key"]: r["value"] for r in await cursor.fetchall()}
+        cursor = await db.execute("SELECT * FROM goals ORDER BY created_at DESC")
+        goals = [dict(r) for r in await cursor.fetchall()]
     finally:
         await db.close()
 
     from datetime import date as d
     export = {
         "export_date": d.today().isoformat(),
-        "version": "3.0",
+        "version": "4.0",
         "reviews": reviews,
         "plans": plans,
         "vulnerability_matrix": vulns,
         "plan_templates": templates,
         "trade_rules": rules,
         "journal": journal,
+        "goals": goals,
         "config": config,
     }
 
@@ -301,6 +304,16 @@ async def import_all(file: UploadFile = File(...)):
                 (j["trade_date"], j["content"]),
             )
         counts["journal"] = len(data.get("journal", []))
+
+        # Import goals
+        for g in data.get("goals", []):
+            if not g.get("title") or not g.get("target_month"):
+                continue
+            await db.execute(
+                "INSERT OR IGNORE INTO goals (title, goal_type, target_month, status) VALUES (?, ?, ?, ?)",
+                (g["title"], g.get("goal_type", "monthly"), g["target_month"], g.get("status", "active")),
+            )
+        counts["goals"] = len(data.get("goals", []))
 
         await db.commit()
     finally:
