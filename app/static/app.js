@@ -55,6 +55,38 @@ function toast(msg, type = 'success') {
 }
 
 // --- Plans ---
+async function generateDailyInsight() {
+    const btn = document.getElementById('insight-btn');
+    const box = document.getElementById('daily-insight-box');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    box.style.display = 'block';
+    box.textContent = '';
+    try {
+        const res = await fetch('/api/insights/daily', { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+                try {
+                    const payload = JSON.parse(line.slice(6));
+                    if (payload.chunk) box.textContent += payload.chunk;
+                    if (payload.error) box.textContent = 'AI 暂不可用: ' + payload.error;
+                } catch(e) {}
+            }
+        }
+    } catch (e) { box.textContent = '获取失败: ' + e.message; }
+    btn.disabled = false;
+    btn.textContent = '🤖 获取今日 AI 建议';
+}
+
 async function loadPlans() {
     const today = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
