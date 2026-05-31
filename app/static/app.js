@@ -59,15 +59,25 @@ async function loadPlans() {
     const today = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     try {
-        const [todayPlans, tomorrowPlans, warnings] = await Promise.all([
+        const [todayPlans, tomorrowPlans, warnings, todayReviews] = await Promise.all([
             api(`/api/plans?trade_date=${today}&plan_type=today`),
             api(`/api/plans?trade_date=${tomorrow}&plan_type=tomorrow`),
             api('/api/plans/warnings'),
+            api(`/api/reviews?trade_date=${today}`),
         ]);
         renderPlans('today-plans', todayPlans);
         renderPlans('tomorrow-plans', tomorrowPlans);
         renderWarnings(warnings);
         loadTemplates();
+        // Today status
+        const statusEl = document.getElementById('today-status');
+        if (todayReviews.length) {
+            const pnl = todayReviews.reduce((s, r) => s + (r.pnl || 0), 0);
+            const cls = pnl >= 0 ? 'positive' : 'negative';
+            statusEl.innerHTML = `📊 今日已复盘 ${todayReviews.length} 次 | 盈亏: <span class="${cls}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(1)}</span>`;
+        } else {
+            statusEl.textContent = '📊 今日尚未复盘';
+        }
     } catch (e) { toast(e.message, 'error'); }
 }
 
