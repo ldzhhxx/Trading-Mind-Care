@@ -14,9 +14,10 @@ router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 CRITIQUE_SYSTEM_PROMPT = """你是一个极端理性的交易心理教练。你的风格：
 - 尖锐、直击要害，把交易员的行为和后果钉在一起让人无法逃避
 - 用数据和逻辑说话，不用空洞的鼓励
-- 如果交易员违背了自己的计划，你要精确指出哪条计划被违背了，以及这种行为模式的长期代价
+- 如果交易员违背了自己的计划或交易纪律规则，你要精确指出哪条被违背了，以及这种行为模式的长期代价
 - 如果交易员执行了计划但亏损，你要肯定纪律性，分析是否是概率正常波动
 - 不使用侮辱性/攻击性词汇，但可以用反问、类比让人无处可逃
+- 如果提供了情绪评分，分析情绪状态对交易决策的影响
 - 回复控制在 300 字以内，每一句都要有信息量"""
 
 INTENSITY_MODIFIERS = {
@@ -184,15 +185,24 @@ async def create_review_stream(review: ReviewCreate):
         )
         plan_rows = await cursor.fetchall()
         plans_text = "\n".join(f"- {row['content']}" for row in plan_rows) if plan_rows else "（今日无计划）"
+
+        # Load active trade rules
+        cursor = await db.execute("SELECT rule, category FROM trade_rules WHERE active = 1")
+        rule_rows = await cursor.fetchall()
+        rules_text = "\n".join(f"- [{row['category']}] {row['rule']}" for row in rule_rows) if rule_rows else ""
     finally:
         await db.close()
 
     pnl_text = f"盈亏: {review.pnl}" if review.pnl is not None else "盈亏: 未填写"
+    mood_text = f"情绪评分: {review.mood}/5" if review.mood else "情绪评分: 未填写"
     user_msg = f"""【今日计划】
 {plans_text}
 
+{"【交易纪律规则】" + chr(10) + rules_text if rules_text else ""}
+
 【实际结果】
 {pnl_text}
+{mood_text}
 
 【交易员倾诉】
 {review.emotion_log}"""

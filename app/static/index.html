@@ -57,6 +57,20 @@
                 <h3 style="margin-bottom:0.5rem">📌 计划模板 <small style="color:var(--text-dim);font-weight:normal">（点击插入）</small></h3>
                 <div id="templates-list"></div>
             </div>
+            <div id="rules-section" style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">
+                <h3 style="margin-bottom:0.5rem">📏 交易纪律规则 <small style="color:var(--text-dim);font-weight:normal">（AI 复盘时会检查是否违反）</small></h3>
+                <div id="rules-list"></div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.8rem;flex-wrap:wrap;align-items:flex-end">
+                    <input id="rule-input" placeholder="输入交易规则，如：单笔亏损不超过2%" style="flex:1;min-width:200px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">
+                    <select id="rule-category" style="padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">
+                        <option value="风控">风控</option>
+                        <option value="纪律">纪律</option>
+                        <option value="心态">心态</option>
+                        <option value="general">通用</option>
+                    </select>
+                    <button onclick="addRule()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">+ 添加规则</button>
+                </div>
+            </div>
         </section>
 
         <!-- Review Tab -->

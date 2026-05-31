@@ -69,6 +69,7 @@ async function loadPlans() {
         renderPlans('tomorrow-plans', tomorrowPlans);
         renderWarnings(warnings);
         loadTemplates();
+        loadRules();
         // Today status
         const statusEl = document.getElementById('today-status');
         if (todayReviews.length) {
@@ -172,6 +173,42 @@ async function deleteTemplate(id) {
         await api(`/api/plans/templates/${id}`, { method: 'DELETE' });
         loadTemplates();
     } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Trade Rules ---
+async function loadRules() {
+    try {
+        const rules = await api('/api/rules');
+        const el = document.getElementById('rules-list');
+        if (!rules.length) { el.innerHTML = '<span style="color:var(--text-dim);font-size:0.85rem">暂无规则，添加你的交易纪律</span>'; return; }
+        el.innerHTML = rules.map(r => `<div class="plan-item" style="opacity:${r.active ? 1 : 0.5}">
+            <input type="checkbox" ${r.active ? 'checked' : ''} onchange="toggleRule(${r.id})" style="cursor:pointer">
+            <span class="content"><span style="color:var(--accent);font-size:0.75rem;margin-right:0.3rem">[${esc(r.category)}]</span>${esc(r.rule)}</span>
+            <span class="actions"><button onclick="deleteRule(${r.id})" title="删除">✕</button></span>
+        </div>`).join('');
+    } catch (e) {}
+}
+
+async function addRule() {
+    const input = document.getElementById('rule-input');
+    const rule = input.value.trim();
+    if (!rule) return;
+    const category = document.getElementById('rule-category').value;
+    try {
+        await api('/api/rules', { method: 'POST', body: JSON.stringify({ rule, category }) });
+        input.value = '';
+        loadRules();
+        toast('规则已添加');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function toggleRule(id) {
+    try { await api(`/api/rules/${id}/toggle`, { method: 'PATCH' }); loadRules(); } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteRule(id) {
+    if (!confirm('确定删除此规则？')) return;
+    try { await api(`/api/rules/${id}`, { method: 'DELETE' }); loadRules(); } catch (e) { toast(e.message, 'error'); }
 }
 
 async function editPlan(id) {

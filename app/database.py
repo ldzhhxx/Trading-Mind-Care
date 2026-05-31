@@ -72,6 +72,14 @@ async def init_db():
             content TEXT NOT NULL UNIQUE
         );
 
+        CREATE TABLE IF NOT EXISTS trade_rules (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule       TEXT NOT NULL,
+            category   TEXT NOT NULL DEFAULT 'general',
+            active     INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        );
+
         CREATE INDEX IF NOT EXISTS idx_plans_date ON plans(trade_date);
         CREATE INDEX IF NOT EXISTS idx_reviews_date ON reviews(trade_date);
         """)
