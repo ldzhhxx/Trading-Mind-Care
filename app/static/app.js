@@ -155,9 +155,11 @@ function renderPlans(containerId, plans) {
         el.innerHTML = '<div class="empty-state"><div class="icon">📝</div><div class="msg">暂无计划</div><div class="hint">在下方输入框添加你的交易计划</div></div>';
         return;
     }
+    const catColors = {'入场':'#4ecdc4','出场':'#ff6b6b','风控':'#ffa502','心态':'#a29bfe','通用':'var(--text-dim)'};
     el.innerHTML = plans.map(p => `
         <div class="plan-item ${p.done ? 'done' : ''}" id="plan-${p.id}">
             <input type="checkbox" ${p.done ? 'checked' : ''} onchange="togglePlanDone(${p.id})" style="cursor:pointer">
+            ${p.category && p.category !== '通用' ? `<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:8px;background:${catColors[p.category] || 'var(--surface2)'};color:#fff;margin-right:0.3rem">${p.category}</span>` : ''}
             <span class="content" style="${p.done ? 'text-decoration:line-through;opacity:0.6' : ''}">${esc(p.content)}</span>
             <span class="actions">
                 <button onclick="editPlan(${p.id})" title="编辑">✎</button>
@@ -179,6 +181,8 @@ async function addPlan(type) {
     const input = document.getElementById(type + '-input');
     const content = input.value.trim();
     if (!content) return;
+    const categoryEl = document.getElementById(type + '-category');
+    const category = categoryEl ? categoryEl.value : '通用';
 
     // Check keyword warnings before adding
     try {
@@ -191,7 +195,7 @@ async function addPlan(type) {
     } catch (e) {}
 
     try {
-        await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content }) });
+        await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content, category }) });
         input.value = '';
         loadPlans();
         // Async AI plan clarity check (non-blocking)

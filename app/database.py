@@ -166,6 +166,9 @@ async def _run_migrations(db):
         (9, "CREATE INDEX IF NOT EXISTS idx_plans_type_date ON plans(plan_type, trade_date)"),
         (10, "CREATE INDEX IF NOT EXISTS idx_vuln_weight ON vulnerability_matrix(weight DESC)"),
         (11, "CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status)"),
+        # Migration 12: Plan category + template category (v7.0)
+        (12, "ALTER TABLE plans ADD COLUMN category TEXT NOT NULL DEFAULT '通用'"),
+        (13, "ALTER TABLE plan_templates ADD COLUMN category TEXT NOT NULL DEFAULT '通用'"),
     ]
 
     for version, sql in migrations:

@@ -11,6 +11,7 @@ class PlanCreate(BaseModel):
     plan_type: str  # 'today' or 'tomorrow'
     content: str
     trade_date: str | None = None
+    category: str = "通用"
 
     @field_validator("content")
     @classmethod
@@ -70,8 +71,8 @@ async def create_plan(plan: PlanCreate):
     db = await get_db()
     try:
         cursor = await db.execute(
-            "INSERT INTO plans (plan_type, content, trade_date) VALUES (?, ?, ?)",
-            (plan.plan_type, plan.content, trade_date),
+            "INSERT INTO plans (plan_type, content, trade_date, category) VALUES (?, ?, ?, ?)",
+            (plan.plan_type, plan.content, trade_date, plan.category),
         )
         await db.commit()
         return {"id": cursor.lastrowid, "trade_date": trade_date}

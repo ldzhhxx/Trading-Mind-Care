@@ -44,7 +44,14 @@
                     <div id="today-plans"></div>
                     <div class="plan-input">
                         <textarea id="today-input" placeholder="输入今日计划..." rows="2"></textarea>
-                        <div style="display:flex;gap:0.4rem;margin-top:0.5rem">
+                        <div style="display:flex;gap:0.4rem;margin-top:0.5rem;align-items:center">
+                            <select id="today-category" style="padding:0.3rem 0.5rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.8rem">
+                                <option value="通用">通用</option>
+                                <option value="入场">入场</option>
+                                <option value="出场">出场</option>
+                                <option value="风控">风控</option>
+                                <option value="心态">心态</option>
+                            </select>
                             <button onclick="addPlan('today')">添加</button>
                             <button class="secondary" onclick="saveAsTemplate('today')" style="font-size:0.8rem">存为模板</button>
                             <button class="secondary" onclick="copyYesterday()" style="font-size:0.8rem">复制昨日</button>
