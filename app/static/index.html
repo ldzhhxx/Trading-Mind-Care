@@ -87,6 +87,13 @@
                 <input type="date" id="review-date-input" style="background:var(--surface);border:1px solid var(--surface2);color:var(--text);padding:0.4rem 0.6rem;border-radius:var(--radius);font-size:0.9rem;width:auto">
                 <label>今日盈亏（可选）</label>
                 <input type="number" id="pnl-input" step="0.01" placeholder="正数为盈利，负数为亏损">
+                <div class="pnl-presets" style="display:flex;gap:0.3rem;margin-top:0.3rem;flex-wrap:wrap">
+                    <button type="button" class="secondary" onclick="document.getElementById('pnl-input').value='-100'" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">-100</button>
+                    <button type="button" class="secondary" onclick="document.getElementById('pnl-input').value='-50'" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">-50</button>
+                    <button type="button" class="secondary" onclick="document.getElementById('pnl-input').value='0'" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">0</button>
+                    <button type="button" class="secondary" onclick="document.getElementById('pnl-input').value='50'" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">+50</button>
+                    <button type="button" class="secondary" onclick="document.getElementById('pnl-input').value='100'" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">+100</button>
+                </div>
                 <label>交易时情绪状态</label>
                 <div class="mood-selector" id="mood-selector">
                     <button type="button" class="mood-btn" data-mood="1" onclick="selectMood(1)" title="非常糟糕">😫</button>
