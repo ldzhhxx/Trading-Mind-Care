@@ -199,6 +199,15 @@
                 </div>
                 <div id="weekly-summary" class="critique-box" style="display:none"></div>
             </div>
+            <div style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">
+                <h3>📋 深度分析报告</h3>
+                <p class="hint" style="margin-bottom:0.8rem">AI 综合所有数据维度生成结构化报告</p>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                    <button onclick="generateDeepReport('weekly')" id="deep-weekly-btn" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">📊 本周深度报告</button>
+                    <button onclick="generateDeepReport('monthly')" id="deep-monthly-btn" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">📊 本月深度报告</button>
+                </div>
+                <div id="deep-report" class="critique-box" style="display:none;margin-top:1rem;white-space:pre-wrap"></div>
+            </div>
         </section>
 
         <!-- Daily Report Tab -->
