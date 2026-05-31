@@ -366,6 +366,41 @@ async def create_review_stream(review: ReviewCreate):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+@router.post("/quick")
+async def quick_review(review: ReviewCreate):
+    """快速复盘模式：保存记录，不等待AI（后台异步处理）."""
+    trade_date = review.trade_date or date.today().isoformat()
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood) VALUES (?, ?, ?, ?, ?)",
+            (trade_date, review.pnl, review.emotion_log, None, review.mood),
+        )
+        review_id = cursor.lastrowid
+        await db.commit()
+        return {"id": review_id, "quick": True, "message": "快速复盘已保存，可稍后重新拷打获取AI点评"}
+    finally:
+        await db.close()
+
+
+@router.get("/mood-trend")
+async def mood_trend():
+    """情绪趋势图数据（近30天）."""
+    today = date.today()
+    start = (today - timedelta(days=29)).isoformat()
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, AVG(mood) as avg_mood, AVG(pnl) as avg_pnl "
+            "FROM reviews WHERE trade_date >= ? AND mood IS NOT NULL "
+            "GROUP BY trade_date ORDER BY trade_date",
+            (start,)
+        )
+        return [{"date": r["trade_date"], "mood": round(r["avg_mood"], 1), "pnl": round(r["avg_pnl"] or 0, 1)} for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
 async def _extract_weaknesses(db, emotion_log: str, critique: str) -> list[str]:
     """Extract weaknesses from review and update matrix. Returns list of new tags."""
     messages = [

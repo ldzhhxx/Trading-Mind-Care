@@ -2,11 +2,15 @@
 import csv
 import io
 import json
+import os
+import shutil
+import logging
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import StreamingResponse, FileResponse
 from app.database import get_db, get_db_path
 
 router = APIRouter(prefix="/api/data", tags=["data"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/export/reviews")
@@ -183,3 +187,123 @@ async def export_all():
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=trading_mind_care_full_backup.json"},
     )
+
+
+@router.post("/auto-backup")
+async def auto_backup():
+    """Create an automatic timestamped backup of the database."""
+    from datetime import datetime
+    db_path = get_db_path()
+    backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(backup_dir, f"mind_care_{timestamp}.db")
+
+    # Limit to 7 backups
+    existing = sorted(
+        [f for f in os.listdir(backup_dir) if f.endswith(".db")],
+        reverse=True
+    )
+    for old in existing[6:]:
+        try:
+            os.remove(os.path.join(backup_dir, old))
+        except Exception:
+            pass
+
+    try:
+        shutil.copy2(db_path, backup_path)
+        size_kb = round(os.path.getsize(backup_path) / 1024, 1)
+        return {"ok": True, "path": backup_path, "size_kb": size_kb, "timestamp": timestamp}
+    except Exception as e:
+        logger.error(f"Auto-backup failed: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+@router.get("/backups")
+async def list_backups():
+    """List available database backups."""
+    db_path = get_db_path()
+    backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+    if not os.path.exists(backup_dir):
+        return []
+    files = sorted(
+        [f for f in os.listdir(backup_dir) if f.endswith(".db")],
+        reverse=True
+    )
+    return [
+        {"name": f, "size_kb": round(os.path.getsize(os.path.join(backup_dir, f)) / 1024, 1)}
+        for f in files
+    ]
+
+
+@router.post("/import/all")
+async def import_all(file: UploadFile = File(...)):
+    """Import full backup JSON (exported from /api/data/export/all)."""
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        return {"error": "无效的 JSON 文件", "imported": {}}
+
+    if not isinstance(data, dict):
+        return {"error": "JSON 格式不正确", "imported": {}}
+
+    db = await get_db()
+    counts = {}
+    try:
+        # Import reviews
+        for r in data.get("reviews", []):
+            if not r.get("trade_date") or not r.get("emotion_log"):
+                continue
+            await db.execute(
+                "INSERT OR IGNORE INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood) VALUES (?, ?, ?, ?, ?)",
+                (r["trade_date"], r.get("pnl"), r["emotion_log"], r.get("ai_critique"), r.get("mood")),
+            )
+        counts["reviews"] = len(data.get("reviews", []))
+
+        # Import plans
+        for p in data.get("plans", []):
+            if not p.get("content") or not p.get("trade_date"):
+                continue
+            await db.execute(
+                "INSERT OR IGNORE INTO plans (plan_type, content, trade_date, done) VALUES (?, ?, ?, ?)",
+                (p.get("plan_type", "today"), p["content"], p["trade_date"], p.get("done", 0)),
+            )
+        counts["plans"] = len(data.get("plans", []))
+
+        # Import vulnerability matrix
+        for v in data.get("vulnerability_matrix", []):
+            if not v.get("tag"):
+                continue
+            await db.execute(
+                "INSERT OR IGNORE INTO vulnerability_matrix (tag, weight, hit_count, last_hit_at, description, category) VALUES (?, ?, ?, ?, ?, ?)",
+                (v["tag"], v.get("weight", 1.0), v.get("hit_count", 0), v.get("last_hit_at"), v.get("description"), v.get("category", "未分类")),
+            )
+        counts["vulnerabilities"] = len(data.get("vulnerability_matrix", []))
+
+        # Import trade rules
+        for r in data.get("trade_rules", []):
+            if not r.get("rule"):
+                continue
+            await db.execute(
+                "INSERT OR IGNORE INTO trade_rules (rule, category, active) VALUES (?, ?, ?)",
+                (r["rule"], r.get("category", "general"), r.get("active", 1)),
+            )
+        counts["rules"] = len(data.get("trade_rules", []))
+
+        # Import journal
+        for j in data.get("journal", []):
+            if not j.get("content") or not j.get("trade_date"):
+                continue
+            await db.execute(
+                "INSERT OR IGNORE INTO journal (trade_date, content) VALUES (?, ?)",
+                (j["trade_date"], j["content"]),
+            )
+        counts["journal"] = len(data.get("journal", []))
+
+        await db.commit()
+    finally:
+        await db.close()
+
+    return {"imported": counts}

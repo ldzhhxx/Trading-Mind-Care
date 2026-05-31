@@ -1162,3 +1162,180 @@ const origSubmit = submitReview;
 
 // Initial load
 loadPlans();
+
+// --- Quick Review ---
+async function quickReview() {
+    const emotion = document.getElementById('emotion-input').value.trim();
+    if (!emotion) { toast('请填写交易倾诉', 'error'); return; }
+    const pnlVal = document.getElementById('pnl-input').value;
+    const pnl = pnlVal ? parseFloat(pnlVal) : null;
+    const trade_date = document.getElementById('review-date-input').value || null;
+    const mood = selectedMood;
+    try {
+        const res = await api('/api/reviews/quick', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood }) });
+        toast('⚡ 快速复盘已保存');
+        document.getElementById('emotion-input').value = '';
+        document.getElementById('pnl-input').value = '';
+        selectedMood = null;
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+        localStorage.removeItem('review_draft');
+        loadReviews();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Analytics ---
+async function loadAnalytics(type) {
+    const el = document.getElementById('analytics-content');
+    el.innerHTML = '<div style="color:var(--text-dim)">加载中...</div>';
+    try {
+        let data, html = '';
+        if (type === 'pnl') {
+            data = await api('/api/analytics/pnl-distribution');
+            const maxAbs = Math.max(...data.distribution.map(d => Math.abs(d.pnl)), 1);
+            html = `<h3>盈亏分布对比</h3>
+            <div class="stats-grid" style="margin-bottom:1.5rem">
+                <div class="stat-card"><div class="value positive">${data.win_days_count}</div><div class="label">盈利天数</div></div>
+                <div class="stat-card"><div class="value negative">${data.loss_days_count}</div><div class="label">亏损天数</div></div>
+                <div class="stat-card"><div class="value positive">+${data.win_avg_pnl.toFixed(1)}</div><div class="label">盈利日均盈</div></div>
+                <div class="stat-card"><div class="value negative">${data.loss_avg_pnl.toFixed(1)}</div><div class="label">亏损日均亏</div></div>
+                <div class="stat-card"><div class="value">${data.win_avg_mood.toFixed(1)}/5</div><div class="label">盈利日情绪</div></div>
+                <div class="stat-card"><div class="value">${data.loss_avg_mood.toFixed(1)}/5</div><div class="label">亏损日情绪</div></div>
+                <div class="stat-card"><div class="value">${data.win_plan_rate.toFixed(0)}%</div><div class="label">盈利日执行率</div></div>
+                <div class="stat-card"><div class="value">${data.loss_plan_rate.toFixed(0)}%</div><div class="label">亏损日执行率</div></div>
+            </div>
+            <h4>盈亏分布图</h4>
+            <div class="pnl-trend" style="height:80px">${data.distribution.slice(-30).map(d => {
+                const h = Math.max(4, Math.abs(d.pnl) / maxAbs * 60);
+                const color = d.pnl >= 0 ? 'var(--success)' : 'var(--danger)';
+                return `<div class="trend-bar-wrap" title="${d.date}: ${d.pnl > 0 ? '+' : ''}${d.pnl.toFixed(1)}"><div class="trend-bar" style="height:${h}px;background:${color};align-self:${d.pnl >= 0 ? 'flex-end' : 'flex-start'}"></div></div>`;
+            }).join('')}</div>`;
+        } else if (type === 'emotion') {
+            data = await api('/api/analytics/emotion-correlation');
+            const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
+            html = `<h3>情绪与盈亏相关性</h3>
+            <div style="margin-bottom:1rem;padding:0.8rem;background:var(--surface);border-radius:var(--radius)">
+                <strong>相关系数：</strong>${data.correlation} | <strong>结论：</strong>${data.insight} | <strong>样本量：</strong>${data.sample_size}
+            </div>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap">${(data.mood_stats || []).map(m => `
+                <div class="stat-card" style="min-width:100px">
+                    <div class="value">${moods[m.mood] || m.mood}</div>
+                    <div class="label">平均盈亏: <span class="${m.avg_pnl >= 0 ? 'positive' : 'negative'}">${m.avg_pnl >= 0 ? '+' : ''}${m.avg_pnl}</span></div>
+                    <div style="font-size:0.75rem;color:var(--text-dim)">胜率${m.win_rate}% | ${m.count}次</div>
+                </div>`).join('')}</div>`;
+        } else if (type === 'plan') {
+            data = await api('/api/analytics/plan-correlation');
+            html = `<h3>计划执行率与盈亏</h3>
+            <div style="margin-bottom:1rem;padding:0.8rem;background:var(--surface);border-radius:var(--radius)">${data.insight}</div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="value">${data.high_exec.count}天</div><div class="label">高执行率(≥80%)</div><div class="${data.high_exec.avg_pnl >= 0 ? 'positive' : 'negative'}" style="font-family:var(--font-mono)">${data.high_exec.avg_pnl >= 0 ? '+' : ''}${data.high_exec.avg_pnl}</div></div>
+                <div class="stat-card"><div class="value">${data.mid_exec.count}天</div><div class="label">中执行率(40-80%)</div><div class="${data.mid_exec.avg_pnl >= 0 ? 'positive' : 'negative'}" style="font-family:var(--font-mono)">${data.mid_exec.avg_pnl >= 0 ? '+' : ''}${data.mid_exec.avg_pnl}</div></div>
+                <div class="stat-card"><div class="value">${data.low_exec.count}天</div><div class="label">低执行率(<40%)</div><div class="${data.low_exec.avg_pnl >= 0 ? 'positive' : 'negative'}" style="font-family:var(--font-mono)">${data.low_exec.avg_pnl >= 0 ? '+' : ''}${data.low_exec.avg_pnl}</div></div>
+            </div>`;
+        } else if (type === 'session') {
+            data = await api('/api/analytics/session-analysis');
+            html = `<h3>交易时段分析</h3>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="value">🌅</div><div class="label">上午(6-12点)</div><div style="font-size:0.85rem">${data.morning.count}次 | 胜率${data.morning.win_rate}%<br><span class="${data.morning.avg_pnl >= 0 ? 'positive' : 'negative'}">${data.morning.avg_pnl >= 0 ? '+' : ''}${data.morning.avg_pnl}</span></div></div>
+                <div class="stat-card"><div class="value">☀️</div><div class="label">下午(12-18点)</div><div style="font-size:0.85rem">${data.afternoon.count}次 | 胜率${data.afternoon.win_rate}%<br><span class="${data.afternoon.avg_pnl >= 0 ? 'positive' : 'negative'}">${data.afternoon.avg_pnl >= 0 ? '+' : ''}${data.afternoon.avg_pnl}</span></div></div>
+                <div class="stat-card"><div class="value">🌙</div><div class="label">夜盘(18-6点)</div><div style="font-size:0.85rem">${data.evening.count}次 | 胜率${data.evening.win_rate}%<br><span class="${data.evening.avg_pnl >= 0 ? 'positive' : 'negative'}">${data.evening.avg_pnl >= 0 ? '+' : ''}${data.evening.avg_pnl}</span></div></div>
+            </div>`;
+        } else if (type === 'weakness') {
+            data = await api('/api/analytics/weakness-timeline');
+            html = `<h3>弱点时间分布</h3>`;
+            if (data.vulnerabilities.length) {
+                html += `<table style="width:100%;font-size:0.85rem"><thead><tr><th>弱点</th><th>权重</th><th>触发</th><th>月度分布</th></tr></thead><tbody>`;
+                for (const v of data.vulnerabilities) {
+                    const timeline = data.timeline[v.tag] || {};
+                    const months = Object.entries(timeline).sort().slice(-6);
+                    const maxHit = Math.max(...months.map(m => m[1]), 1);
+                    const bars = months.map(([m, c]) => `<span title="${m}: ${c}次" style="display:inline-block;width:${Math.max(4, c/maxHit*30)}px;height:10px;background:var(--accent);border-radius:2px;margin-right:2px"></span>`).join('');
+                    html += `<tr><td>${esc(v.tag)}</td><td>${v.weight.toFixed(1)}</td><td>${v.hit_count}</td><td>${bars || '-'}</td></tr>`;
+                }
+                html += `</tbody></table>`;
+            } else {
+                html += '<p style="color:var(--text-dim)">暂无弱点数据</p>';
+            }
+        }
+        el.innerHTML = html;
+    } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
+}
+
+async function aiAnalytics(type) {
+    const box = document.getElementById('ai-analytics-result');
+    box.style.display = 'block';
+    box.textContent = '分析中...';
+    const endpoints = {
+        'week-compare': '/api/analytics/ai-week-compare',
+        'danger': '/api/analytics/ai-danger-signals',
+        'weakness-deep': '/api/analytics/ai-weakness-deep',
+    };
+    try {
+        const res = await fetch(endpoints[type], { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        box.textContent = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+                try {
+                    const payload = JSON.parse(line.slice(6));
+                    if (payload.chunk) box.textContent += payload.chunk;
+                    if (payload.error) box.textContent = 'AI 暂不可用: ' + payload.error;
+                } catch(e) {}
+            }
+        }
+    } catch (e) { box.textContent = '分析失败: ' + e.message; }
+}
+
+// --- Auto Backup ---
+async function triggerAutoBackup() {
+    try {
+        const res = await api('/api/data/auto-backup', { method: 'POST' });
+        if (res.ok) toast(`备份成功 (${res.size_kb}KB)`);
+        else toast('备份失败: ' + res.error, 'error');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Import All ---
+async function importAll() {
+    const fileInput = document.getElementById('import-file');
+    if (!fileInput.files.length) { toast('请选择文件', 'error'); return; }
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    try {
+        const res = await fetch('/api/data/import/all', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.error) { toast(data.error, 'error'); return; }
+        const counts = data.imported;
+        toast(`导入完成: 复盘${counts.reviews||0}, 计划${counts.plans||0}, 弱点${counts.vulnerabilities||0}, 规则${counts.rules||0}, 日记${counts.journal||0}`);
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Plan AI Check ---
+async function checkPlanClarity(content) {
+    if (!content || content.length < 5) return;
+    try {
+        const res = await api('/api/analytics/ai-plan-check', { method: 'POST', body: JSON.stringify({ content }) });
+        if (res.suggestions && res.suggestions.length) {
+            const msg = res.suggestions.map(s => `⚠️ ${s.issue}\n   → ${s.suggestion}`).join('\n\n');
+            const box = document.getElementById('daily-insight-box');
+            box.style.display = 'block';
+            box.textContent = '📋 计划审核建议：\n' + msg;
+        }
+    } catch(e) {}
+}
+
+// Tab handler for analytics
+const origTabHandler = document.querySelectorAll('.tab');
+origTabHandler.forEach(btn => {
+    const origClick = btn.onclick;
+    btn.addEventListener('click', () => {
+        if (btn.dataset.tab === 'analytics') loadAnalytics('pnl');
+    });
+});

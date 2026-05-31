@@ -241,3 +241,26 @@ async def batch_reset_plans(trade_date: str | None = None):
         return {"reset": cursor.rowcount}
     finally:
         await db.close()
+
+
+@router.get("/execution-trend")
+async def plan_execution_trend():
+    """计划完成率趋势图数据（近30天）."""
+    today = date.today()
+    db = await get_db()
+    try:
+        results = []
+        for i in range(29, -1, -1):
+            d = (today - timedelta(days=i)).isoformat()
+            cursor = await db.execute(
+                "SELECT COUNT(*) as total, SUM(done) as completed FROM plans WHERE trade_date = ? AND plan_type='today'",
+                (d,)
+            )
+            row = await cursor.fetchone()
+            total = row["total"]
+            completed = row["completed"] or 0
+            if total > 0:
+                results.append({"date": d, "rate": round(completed / total * 100, 1), "total": total, "completed": completed})
+        return results
+    finally:
+        await db.close()

@@ -1,9 +1,11 @@
 """APScheduler setup for daily tasks."""
 import logging
+import os
+import shutil
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import date
-from app.database import get_db
+from datetime import date, datetime
+from app.database import get_db, get_db_path
 from app.feishu import send_daily_notification, send_plan_incomplete_alert
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,29 @@ async def daily_decay():
         await db.close()
 
 
+async def daily_auto_backup():
+    """Create daily automatic backup, keep last 7."""
+    try:
+        db_path = get_db_path()
+        backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(backup_dir, f"mind_care_{timestamp}.db")
+        shutil.copy2(db_path, backup_path)
+
+        # Keep only last 7
+        existing = sorted([f for f in os.listdir(backup_dir) if f.endswith(".db")], reverse=True)
+        for old in existing[7:]:
+            try:
+                os.remove(os.path.join(backup_dir, old))
+            except Exception:
+                pass
+        logger.info(f"Daily backup created: {backup_path}")
+    except Exception as e:
+        logger.error(f"Daily backup failed: {e}")
+
+
 def start_scheduler():
     """Start background scheduler for daily tasks."""
     # Daily notification at configured time (default 8:30)
@@ -48,5 +73,7 @@ def start_scheduler():
     scheduler.add_job(daily_decay, CronTrigger(hour=0, minute=5), id="daily_decay", replace_existing=True)
     # Plan incomplete reminder at 20:00
     scheduler.add_job(send_plan_incomplete_alert, CronTrigger(hour=20, minute=0), id="plan_incomplete", replace_existing=True)
+    # Daily auto-backup at 23:55
+    scheduler.add_job(daily_auto_backup, CronTrigger(hour=23, minute=55), id="daily_backup", replace_existing=True)
     scheduler.start()
     logger.info("Scheduler started")

@@ -20,6 +20,7 @@
             <button class="tab" data-tab="review">🔥 复盘</button>
             <button class="tab" data-tab="matrix">📊 弱点矩阵</button>
             <button class="tab" data-tab="stats">📈 统计</button>
+            <button class="tab" data-tab="analytics">🔬 深度分析</button>
             <button class="tab" data-tab="daily">📅 日报</button>
             <button class="tab" data-tab="calendar">🗓️ 日历</button>
             <button class="tab" data-tab="settings">⚙️ 设置</button>
@@ -117,6 +118,7 @@
                 <textarea id="emotion-input" rows="5" placeholder="今天交易中发生了什么？你的感受是什么？有没有违背计划的地方？"></textarea>
                 <div id="char-count" style="text-align:right;font-size:0.75rem;color:var(--text-dim);margin-top:0.2rem">0 / 5000</div>
                 <button id="submit-review" onclick="submitReview()">提交复盘 — 接受拷打</button>
+                <button class="secondary" onclick="quickReview()" style="margin-top:0.3rem;width:100%;font-size:0.85rem">⚡ 快速复盘（跳过AI，30秒完成）</button>
             </div>
             <div id="critique-result" class="critique-box" style="display:none"></div>
             <div class="section-header" style="margin-top:2rem">
@@ -202,6 +204,28 @@
             </div>
         </section>
 
+        <!-- Analytics Tab -->
+        <section id="tab-analytics" class="tab-content">
+            <h2 style="margin-bottom:1rem">🔬 深度分析</h2>
+            <div class="analytics-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.5rem">
+                <button onclick="loadAnalytics('pnl')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">盈亏分布</button>
+                <button onclick="loadAnalytics('emotion')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">情绪相关性</button>
+                <button onclick="loadAnalytics('plan')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">计划执行率</button>
+                <button onclick="loadAnalytics('session')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">交易时段</button>
+                <button onclick="loadAnalytics('weakness')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">弱点时间线</button>
+            </div>
+            <div id="analytics-content"></div>
+            <div style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">
+                <h3 style="margin-bottom:0.8rem">🤖 AI 深度分析</h3>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+                    <button onclick="aiAnalytics('week-compare')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">📊 本周 vs 上周</button>
+                    <button onclick="aiAnalytics('danger')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">⚠️ 危险信号</button>
+                    <button onclick="aiAnalytics('weakness-deep')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🧬 弱点关联</button>
+                </div>
+                <div id="ai-analytics-result" class="critique-box" style="display:none"></div>
+            </div>
+        </section>
+
         <!-- Settings Tab -->
         <section id="tab-settings" class="tab-content">
             <div class="settings-section">
@@ -246,12 +270,16 @@
                     <button class="secondary" onclick="exportData('vulnerabilities','csv')">导出弱点 CSV</button>
                     <button class="secondary" onclick="window.open('/api/data/backup')">下载数据库备份</button>
                     <button class="secondary" onclick="window.open('/api/data/export/all')">导出全部 JSON</button>
+                    <button class="secondary" onclick="triggerAutoBackup()">💾 手动备份</button>
                     <button class="secondary" onclick="checkDataHealth()">🩺 数据健康检查</button>
                 </div>
                 <div id="health-result" style="margin-top:0.8rem;font-size:0.85rem"></div>
-                <label style="margin-top:1rem">导入复盘数据（JSON）</label>
+                <label style="margin-top:1rem">导入数据（JSON - 支持全量备份或复盘数据）</label>
                 <input type="file" id="import-file" accept=".json" style="margin-top:0.3rem">
-                <button onclick="importReviews()" style="margin-top:0.5rem">导入</button>
+                <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                    <button onclick="importReviews()">导入复盘</button>
+                    <button onclick="importAll()" class="secondary">导入全量备份</button>
+                </div>
                 <div id="import-result" style="margin-top:0.5rem;font-size:0.85rem"></div>
             </div>
         </section>
