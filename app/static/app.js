@@ -27,7 +27,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
         const tab = btn.dataset.tab;
         if (tab === 'plans') loadPlans();
-        else if (tab === 'review') { document.getElementById('review-date-input').value = new Date().toISOString().slice(0,10); loadReviews(); }
+        else if (tab === 'review') { document.getElementById('review-date-input').value = new Date().toISOString().slice(0,10); loadReviews(); loadReviewTemplates(); }
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
         else if (tab === 'analytics') loadAnalytics('pnl');
@@ -1804,63 +1804,45 @@ async function sendCoachMessage() {
 }
 
 // --- Review Templates ---
-const REVIEW_TEMPLATES = {
-    standard: `【计划执行】今天的计划执行情况：
-- 执行了：
-- 未执行：
-- 原因：
+let _reviewTemplates = [];
 
-【情绪状态】交易时的情绪变化：
-
-【今日教训】最重要的一个教训：`,
-    deep: `【决策过程】今天最关键的一个决策：
-- 当时的想法：
-- 实际结果：
-- 如果重来会怎么做：
-
-【心理状态】
-- 开盘前心态：
-- 交易中心态变化：
-- 收盘后感受：
-
-【改进计划】明天要改善的一件事：`,
-    loss: `【亏损原因】
-- 直接原因：
-- 深层原因（心态/纪律/认知）：
-
-【规则检查】
-- 是否违反了止损规则：
-- 是否违反了仓位规则：
-- 是否存在报复性交易：
-
-【止损复盘】
-- 止损是否及时：
-- 亏损金额是否在计划内：
-- 下次如何避免：`,
-    win: `【正确决策】今天做对了什么：
-
-【风险回顾】
-- 盈利中是否有运气成分：
-- 是否有过度持仓的时刻：
-- 风险回报比是否合理：
-
-【膨胀检查】
-- 是否因为盈利而放松了纪律：
-- 是否有加仓冲动：
-- 明天是否需要减少交易频率：`
-};
+async function loadReviewTemplates() {
+    try {
+        _reviewTemplates = await api('/api/review-templates');
+        const sel = document.getElementById('review-template-select');
+        sel.innerHTML = '<option value="">📝 选择复盘模板...</option>' +
+            _reviewTemplates.map(t => `<option value="${t.id || t.name}">${t.name} — ${t.description}</option>`).join('');
+    } catch(e) {}
+}
 
 function applyReviewTemplate() {
     const sel = document.getElementById('review-template-select');
-    const tpl = REVIEW_TEMPLATES[sel.value];
-    if (tpl) {
+    const tpl = _reviewTemplates.find(t => (t.id || t.name) === sel.value);
+    if (!tpl) { document.getElementById('review-template-prompts').style.display = 'none'; return; }
+
+    const promptsEl = document.getElementById('review-template-prompts');
+    if (tpl.prompts && tpl.prompts.length) {
+        promptsEl.style.display = 'block';
+        promptsEl.innerHTML = '<strong style="display:block;margin-bottom:0.3rem">引导问题：</strong>' +
+            tpl.prompts.map(p => `<div style="margin:0.2rem 0;cursor:pointer;color:var(--accent)" onclick="insertPrompt('${p.replace(/'/g, "\\'")}\\n')">${p}</div>`).join('');
+        // Also fill textarea with prompts as framework
         const input = document.getElementById('emotion-input');
-        if (input.value.trim() && !confirm('当前已有内容，是否替换为模板？')) {
-            sel.value = '';
-            return;
+        if (!input.value.trim()) {
+            input.value = tpl.prompts.map(p => `【${p}】\n`).join('\n');
         }
-        input.value = tpl;
+    } else {
+        promptsEl.style.display = 'none';
     }
+}
+
+async function aiRecommendTemplate() {
+    try {
+        const result = await api('/api/review-templates/ai-recommend', { method: 'POST' });
+        const sel = document.getElementById('review-template-select');
+        sel.value = result.template_id;
+        applyReviewTemplate();
+        toast(`AI推荐: ${result.reason}`, 'success');
+    } catch(e) { toast('推荐失败', 'error'); }
 }
 
 // --- Deep Reports ---

@@ -169,6 +169,18 @@ async def _run_migrations(db):
         # Migration 12: Plan category + template category (v7.0)
         (12, "ALTER TABLE plans ADD COLUMN category TEXT NOT NULL DEFAULT '通用'"),
         (13, "ALTER TABLE plan_templates ADD COLUMN category TEXT NOT NULL DEFAULT '通用'"),
+        # Migration 14: Review templates table (v8.0)
+        (14, """CREATE TABLE IF NOT EXISTS review_templates (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            prompts     TEXT NOT NULL DEFAULT '[]',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )"""),
+        # Migration 15: Review score column (v8.0)
+        (15, "ALTER TABLE reviews ADD COLUMN score INTEGER"),
+        # Migration 16: Plan tags (v8.0)
+        (16, "ALTER TABLE plans ADD COLUMN tags TEXT NOT NULL DEFAULT ''"),
     ]
 
     for version, sql in migrations:

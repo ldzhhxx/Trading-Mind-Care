@@ -795,3 +795,176 @@ async def daily_risk_score():
         "consecutive_losses": consecutive_losses,
         "consecutive_wins": consecutive_wins,
     }
+
+
+@router.get("/weakness-correlation")
+async def weakness_correlation():
+    """弱点关联图谱 — 分析哪些弱点经常一起出现."""
+    db = await get_db()
+    try:
+        # Get reviews with AI critique that mention weaknesses
+        cursor = await db.execute(
+            "SELECT ai_critique, trade_date FROM reviews WHERE ai_critique IS NOT NULL ORDER BY trade_date DESC LIMIT 100"
+        )
+        reviews = await cursor.fetchall()
+
+        cursor = await db.execute(
+            "SELECT id, tag, weight, hit_count FROM vulnerability_matrix WHERE hit_count > 0 ORDER BY weight DESC"
+        )
+        vulns = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if len(vulns) < 2:
+        return {"nodes": [], "edges": [], "message": "弱点数据不足"}
+
+    # Build co-occurrence matrix
+    from collections import defaultdict
+    co_occur = defaultdict(int)
+    tag_dates = defaultdict(set)
+
+    for r in reviews:
+        critique = r["ai_critique"] or ""
+        td = r["trade_date"]
+        present = [v["tag"] for v in vulns if v["tag"] in critique]
+        for tag in present:
+            tag_dates[tag].add(td)
+        for i in range(len(present)):
+            for j in range(i + 1, len(present)):
+                key = tuple(sorted([present[i], present[j]]))
+                co_occur[key] += 1
+
+    # Build graph data
+    nodes = [{"id": v["tag"], "weight": v["weight"], "hits": v["hit_count"]} for v in vulns[:15]]
+    edges = []
+    for (a, b), count in sorted(co_occur.items(), key=lambda x: -x[1])[:20]:
+        if count >= 2:
+            edges.append({"source": a, "target": b, "strength": count})
+
+    return {"nodes": nodes, "edges": edges}
+
+
+@router.get("/review-score-trend")
+async def review_score_trend():
+    """复盘质量评分趋势."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, score FROM reviews WHERE score IS NOT NULL ORDER BY trade_date DESC LIMIT 30"
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    rows.reverse()
+    avg = sum(r["score"] for r in rows) / len(rows) if rows else 0
+    return {"data": rows, "avg_score": round(avg, 1)}
+
+
+@router.post("/score-review")
+async def score_review(content: dict):
+    """AI 评估复盘质量 (1-10分)."""
+    emotion_log = content.get("emotion_log", "")
+    pnl = content.get("pnl")
+    review_id = content.get("review_id")
+
+    if not emotion_log.strip():
+        return {"score": 0, "feedback": "内容为空"}
+
+    from app.llm import call_llm
+    messages = [
+        {"role": "system", "content": """评估交易复盘的质量，打分1-10。评分标准：
+- 具体性：是否有具体的交易细节（品种、点位、仓位）
+- 反思深度：是否分析了原因而非只描述结果
+- 情绪觉察：是否识别了情绪对决策的影响
+- 行动导向：是否有明确的改进计划
+返回严格JSON：{"score": 数字, "feedback": "一句话点评"}"""},
+        {"role": "user", "content": f"盈亏: {pnl}\n复盘内容: {emotion_log[:500]}"},
+    ]
+
+    try:
+        import json
+        raw = await call_llm(messages)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
+        result = json.loads(raw)
+        score = max(1, min(10, int(result.get("score", 5))))
+        feedback = result.get("feedback", "")
+
+        # Save score to review if review_id provided
+        if review_id:
+            db = await get_db()
+            try:
+                await db.execute("UPDATE reviews SET score = ? WHERE id = ?", (score, review_id))
+                await db.commit()
+            finally:
+                await db.close()
+
+        return {"score": score, "feedback": feedback}
+    except Exception:
+        return {"score": 5, "feedback": "评分暂不可用"}
+
+
+@router.get("/performance-summary")
+async def performance_summary():
+    """综合表现摘要 — 一页看清所有关键指标."""
+    from datetime import date, timedelta
+    today = date.today()
+    week_start = (today - timedelta(days=today.weekday())).isoformat()
+    month_start = today.replace(day=1).isoformat()
+
+    db = await get_db()
+    try:
+        # This week
+        cursor = await db.execute(
+            "SELECT COUNT(*) as cnt, SUM(pnl) as total, AVG(mood) as mood FROM reviews WHERE trade_date >= ? AND pnl IS NOT NULL",
+            (week_start,)
+        )
+        week = dict(await cursor.fetchone())
+
+        # This month
+        cursor = await db.execute(
+            "SELECT COUNT(*) as cnt, SUM(pnl) as total, AVG(mood) as mood FROM reviews WHERE trade_date >= ? AND pnl IS NOT NULL",
+            (month_start,)
+        )
+        month = dict(await cursor.fetchone())
+
+        # Plan rate this week
+        cursor = await db.execute(
+            "SELECT COUNT(*) as total, SUM(done) as done FROM plans WHERE trade_date >= ? AND plan_type='today'",
+            (week_start,)
+        )
+        pr = await cursor.fetchone()
+        week_plan_rate = ((pr["done"] or 0) / pr["total"] * 100) if pr["total"] else 0
+
+        # Top active weakness
+        cursor = await db.execute(
+            "SELECT tag, weight FROM vulnerability_matrix ORDER BY weight DESC LIMIT 1"
+        )
+        top_vuln = await cursor.fetchone()
+
+        # Streak
+        streak = 0
+        d = today
+        while True:
+            cursor = await db.execute("SELECT COUNT(*) as cnt FROM reviews WHERE trade_date = ?", (d.isoformat(),))
+            if (await cursor.fetchone())["cnt"] > 0:
+                streak += 1
+                d -= timedelta(days=1)
+            else:
+                break
+    finally:
+        await db.close()
+
+    return {
+        "week_pnl": round(week["total"] or 0, 1),
+        "week_trades": week["cnt"],
+        "week_mood": round(week["mood"] or 0, 1),
+        "week_plan_rate": round(week_plan_rate, 1),
+        "month_pnl": round(month["total"] or 0, 1),
+        "month_trades": month["cnt"],
+        "streak": streak,
+        "top_weakness": top_vuln["tag"] if top_vuln else None,
+        "top_weakness_weight": round(top_vuln["weight"], 1) if top_vuln else 0,
+    }
