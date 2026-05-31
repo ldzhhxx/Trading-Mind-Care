@@ -69,6 +69,17 @@ async def get_stats():
             else:
                 cur_streak = 0
 
+        # Profit factor & avg win/loss
+        cursor = await db.execute("SELECT COALESCE(SUM(pnl),0) as s FROM reviews WHERE pnl > 0")
+        gross_profit = (await cursor.fetchone())["s"]
+        cursor = await db.execute("SELECT COALESCE(SUM(ABS(pnl)),0) as s FROM reviews WHERE pnl < 0")
+        gross_loss = (await cursor.fetchone())["s"]
+        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else 0
+        cursor = await db.execute("SELECT COALESCE(AVG(pnl),0) as a FROM reviews WHERE pnl > 0")
+        avg_win = (await cursor.fetchone())["a"]
+        cursor = await db.execute("SELECT COALESCE(AVG(pnl),0) as a FROM reviews WHERE pnl < 0")
+        avg_loss = (await cursor.fetchone())["a"]
+
         # Top weaknesses
         cursor = await db.execute(
             "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
@@ -91,6 +102,9 @@ async def get_stats():
             "streak_days": streak,
             "win_rate": round(win_rate, 1),
             "max_loss_streak": max_loss_streak,
+            "profit_factor": round(profit_factor, 2),
+            "avg_win": round(float(avg_win), 1),
+            "avg_loss": round(float(avg_loss), 1),
             "top_weaknesses": top_weaknesses,
             "pnl_trend": pnl_trend,
         }
