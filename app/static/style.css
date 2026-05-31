@@ -411,3 +411,20 @@ button.secondary:hover { background: #1a4a7a; }
 @media (max-width: 400px) {
     .stats-grid { grid-template-columns: 1fr; }
 }
+
+/* Calendar */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+.cal-header { text-align: center; font-size: 0.75rem; color: var(--text-dim); padding: 0.3rem; font-weight: 600; }
+.cal-cell { background: var(--surface); border-radius: var(--radius); padding: 0.4rem; min-height: 52px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cal-cell.empty { background: transparent; }
+.cal-cell.profit { border: 1px solid var(--success); }
+.cal-cell.loss { border: 1px solid var(--danger); }
+.cal-cell.neutral { border: 1px solid var(--text-dim); }
+.cal-day { font-size: 0.8rem; font-weight: 600; }
+.cal-pnl { font-size: 0.7rem; }
+.cal-pnl.positive { color: var(--success); }
+.cal-pnl.negative { color: var(--danger); }

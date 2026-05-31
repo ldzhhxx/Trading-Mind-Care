@@ -15,6 +15,7 @@
             <button class="tab" data-tab="matrix">📊 弱点矩阵</button>
             <button class="tab" data-tab="stats">📈 统计</button>
             <button class="tab" data-tab="daily">📅 日报</button>
+            <button class="tab" data-tab="calendar">🗓️ 日历</button>
             <button class="tab" data-tab="settings">⚙️ 设置</button>
         </nav>
     </header>
@@ -105,6 +106,20 @@
                 <button onclick="loadDailyReport()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">查看</button>
             </div>
             <div id="daily-content"></div>
+        </section>
+
+        <!-- Calendar Tab -->
+        <section id="tab-calendar" class="tab-content">
+            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+                <h2>交易日历</h2>
+                <button onclick="calendarPrev()" class="secondary" style="margin:0;padding:0.3rem 0.6rem">◀</button>
+                <span id="calendar-month-label" style="font-size:1.1rem;font-weight:600"></span>
+                <button onclick="calendarNext()" class="secondary" style="margin:0;padding:0.3rem 0.6rem">▶</button>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+            <div class="calendar-legend" style="margin-top:1rem;display:flex;gap:1.5rem;font-size:0.8rem;color:var(--text-dim)">
+                <span>🟢 盈利</span><span>🔴 亏损</span><span>⚪ 持平/无盈亏</span><span>⬜ 无记录</span>
+            </div>
         </section>
 
         <!-- Settings Tab -->

@@ -13,6 +13,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
         else if (tab === 'daily') loadDailyReport();
+        else if (tab === 'calendar') loadCalendar();
         else if (tab === 'settings') loadSettings();
     });
 });
@@ -608,6 +609,38 @@ document.querySelectorAll('.plan-input textarea').forEach(ta => {
         }
     });
 });
+
+// --- Calendar ---
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth() + 1;
+
+function calendarPrev() { calMonth--; if (calMonth < 1) { calMonth = 12; calYear--; } loadCalendar(); }
+function calendarNext() { calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; } loadCalendar(); }
+
+async function loadCalendar() {
+    document.getElementById('calendar-month-label').textContent = `${calYear}年${calMonth}月`;
+    try {
+        const data = await api(`/api/calendar?year=${calYear}&month=${calMonth}`);
+        const grid = document.getElementById('calendar-grid');
+        const firstDay = new Date(calYear, calMonth - 1, 1).getDay(); // 0=Sun
+        const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+        let html = '<div class="cal-header">日</div><div class="cal-header">一</div><div class="cal-header">二</div><div class="cal-header">三</div><div class="cal-header">四</div><div class="cal-header">五</div><div class="cal-header">六</div>';
+        for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell empty"></div>';
+        for (let d = 1; d <= daysInMonth; d++) {
+            const key = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const info = data.days[key];
+            let cls = 'cal-cell';
+            let badge = '';
+            if (info) {
+                if (info.pnl > 0) { cls += ' profit'; badge = `<span class="cal-pnl positive">+${info.pnl.toFixed(0)}</span>`; }
+                else if (info.pnl < 0) { cls += ' loss'; badge = `<span class="cal-pnl negative">${info.pnl.toFixed(0)}</span>`; }
+                else { cls += ' neutral'; badge = `<span class="cal-pnl">0</span>`; }
+            }
+            html += `<div class="${cls}"><span class="cal-day">${d}</span>${badge}</div>`;
+        }
+        grid.innerHTML = html;
+    } catch (e) { toast(e.message, 'error'); }
+}
 
 // Initial load
 loadPlans();
