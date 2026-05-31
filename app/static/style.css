@@ -470,26 +470,38 @@ body.focus-mode #review-pagination { display: none; }
 /* Responsive */
 @media (max-width: 700px) {
     .plans-grid { grid-template-columns: 1fr; }
-    main { padding: 1rem; }
-    header { padding: 0.8rem 1rem; }
-    nav { gap: 0.3rem; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 0.3rem; -webkit-overflow-scrolling: touch; }
+    main { padding: 0.8rem; }
+    header { padding: 0.6rem 0.8rem; }
+    nav { gap: 0.2rem; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 0.3rem; -webkit-overflow-scrolling: touch; }
     nav::-webkit-scrollbar { height: 3px; }
     nav::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
     .tab { padding: 0.4rem 0.7rem; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .settings-section { max-width: 100%; }
     .review-form textarea { font-size: 16px; } /* Prevent iOS zoom */
+    .review-form input, .review-form select { font-size: 16px; }
     .section-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
     #coach-messages { max-height: 40vh; }
-    .analytics-actions { gap: 0.3rem !important; }
+    .analytics-actions { gap: 0.3rem !important; flex-wrap: wrap !important; }
     .analytics-actions button { padding: 0.3rem 0.6rem !important; font-size: 0.75rem !important; }
+    .mood-selector { gap: 0.3rem; }
+    .mood-btn { font-size: 1.3rem; padding: 0.4rem; }
+    .pnl-presets { gap: 0.2rem; }
+    .review-prompts { gap: 0.2rem !important; }
+    .critique-box { font-size: 0.85rem; padding: 0.8rem; }
+    button { padding: 0.6rem 1rem; }
+    .stat-card { padding: 0.6rem; }
+    .stat-card .value { font-size: 1.1rem; }
 }
 
 @media (max-width: 400px) {
-    .stats-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
     .tab { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
     h1 { font-size: 1.1rem; }
     h2 { font-size: 1rem; }
+    main { padding: 0.5rem; }
+    .stat-card .value { font-size: 1rem; }
+    .stat-card .label { font-size: 0.65rem; }
 }
 
 /* Calendar */
