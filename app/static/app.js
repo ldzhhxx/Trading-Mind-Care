@@ -1083,6 +1083,39 @@ function calendarDayClick(dateStr) {
     loadDailyReport();
 }
 
+// --- Monthly Summary ---
+async function generateMonthlySummary() {
+    const btn = document.getElementById('monthly-btn');
+    const box = document.getElementById('monthly-summary');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    box.style.display = 'block';
+    box.textContent = '';
+    try {
+        const res = await fetch(`/api/monthly/generate?year=${calYear}&month=${calMonth}`, { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+                try {
+                    const payload = JSON.parse(line.slice(6));
+                    if (payload.chunk) box.textContent += payload.chunk;
+                    if (payload.error) box.textContent = 'AI 暂不可用: ' + payload.error;
+                } catch(e) {}
+            }
+        }
+    } catch (e) { box.textContent = '生成失败: ' + e.message; }
+    btn.disabled = false;
+    btn.textContent = '📊 生成本月 AI 总结';
+}
+
 // Prevent accidental page leave with unsaved review
 window.addEventListener('beforeunload', e => {
     const emotion = document.getElementById('emotion-input').value.trim();

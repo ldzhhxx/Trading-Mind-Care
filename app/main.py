@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.database import init_db
 from app.scheduler import start_scheduler, daily_decay
 from app.feishu import send_daily_notification
-from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal
+from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal, monthly
 
 
 def get_static_dir() -> str:
@@ -66,6 +66,7 @@ app.include_router(weekly.router)
 app.include_router(rules.router)
 app.include_router(insights.router)
 app.include_router(journal.router)
+app.include_router(monthly.router)
 
 # Static files
 static_dir = get_static_dir()
