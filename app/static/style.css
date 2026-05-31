@@ -469,3 +469,17 @@ body.focus-mode #review-pagination { display: none; }
     .cal-day { font-size: 0.7rem; }
     .cal-pnl { font-size: 0.6rem; }
 }
+
+/* Analytics section */
+.analytics-actions button.active { background: var(--accent); color: #fff; }
+#analytics-content table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+#analytics-content th, #analytics-content td { padding: 0.5rem 0.8rem; text-align: left; border-bottom: 1px solid var(--surface2); }
+#analytics-content th { color: var(--text-dim); font-weight: 500; }
+
+/* Correlation indicator */
+.corr-positive { color: var(--success); font-weight: 600; }
+.corr-negative { color: var(--danger); font-weight: 600; }
+.corr-neutral { color: var(--text-dim); }
+
+/* Quick review highlight */
+.quick-review-hint { background: var(--surface); border: 1px dashed var(--accent); border-radius: var(--radius); padding: 0.5rem 0.8rem; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.5rem; }

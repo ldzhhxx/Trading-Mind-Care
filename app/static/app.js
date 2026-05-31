@@ -172,6 +172,8 @@ async function addPlan(type) {
         await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content }) });
         input.value = '';
         loadPlans();
+        // Async AI plan clarity check (non-blocking)
+        checkPlanClarity(content);
     } catch (e) { toast(e.message, 'error'); }
 }
 

@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.database import init_db
+from app.database import init_db, get_db
 from app.scheduler import start_scheduler, daily_decay
 from app.feishu import send_daily_notification
 from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal, monthly, analytics
@@ -37,11 +37,28 @@ async def lifespan(app: FastAPI):
     """Application lifespan: init DB, run startup tasks, start scheduler."""
     logger.info("Starting Trading Mind Care...")
     await init_db()
+
+    # Crash recovery: mark startup
+    db = await get_db()
+    try:
+        await db.execute("INSERT OR REPLACE INTO sys_config (key, value) VALUES ('last_clean_shutdown', '0')")
+        await db.commit()
+    finally:
+        await db.close()
+
     await daily_decay()
     await send_daily_notification()
     start_scheduler()
     logger.info("Application ready")
     yield
+
+    # Mark clean shutdown
+    db = await get_db()
+    try:
+        await db.execute("INSERT OR REPLACE INTO sys_config (key, value) VALUES ('last_clean_shutdown', '1')")
+        await db.commit()
+    finally:
+        await db.close()
     logger.info("Shutting down")
 
 
@@ -97,4 +114,11 @@ async def index():
 @app.get("/api/version")
 async def version():
     """Return application version info."""
-    return {"version": "5.0.0", "name": "Trading Mind Care", "features": 75}
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'last_clean_shutdown'")
+        row = await cursor.fetchone()
+        clean = row["value"] == "1" if row else True
+    finally:
+        await db.close()
+    return {"version": "5.0.0", "name": "Trading Mind Care", "features": 75, "last_shutdown_clean": clean}
