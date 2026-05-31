@@ -93,3 +93,44 @@ async def delete_vulnerability(vuln_id: int):
         return {"ok": True}
     finally:
         await db.close()
+
+
+@router.post("/merge")
+async def merge_vulnerabilities(source_id: int, target_id: int):
+    """Merge source vulnerability into target (combine weights and hit counts)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM vulnerability_matrix WHERE id = ?", (source_id,))
+        source = await cursor.fetchone()
+        cursor = await db.execute("SELECT * FROM vulnerability_matrix WHERE id = ?", (target_id,))
+        target = await cursor.fetchone()
+        if not source or not target:
+            raise HTTPException(status_code=404, detail="弱点不存在")
+
+        new_weight = target["weight"] + source["weight"] * 0.5
+        new_hits = target["hit_count"] + source["hit_count"]
+        await db.execute(
+            "UPDATE vulnerability_matrix SET weight = ?, hit_count = ? WHERE id = ?",
+            (new_weight, new_hits, target_id),
+        )
+        await db.execute("DELETE FROM vulnerability_matrix WHERE id = ?", (source_id,))
+        await db.commit()
+        return {"ok": True, "new_weight": new_weight, "new_hits": new_hits}
+    finally:
+        await db.close()
+
+
+@router.post("/{vuln_id}/reset")
+async def reset_vulnerability(vuln_id: int):
+    """Reset a vulnerability's weight to 1.0 (fresh start)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE vulnerability_matrix SET weight = 1.0 WHERE id = ?", (vuln_id,)
+        )
+        await db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="弱点不存在")
+        return {"ok": True}
+    finally:
+        await db.close()

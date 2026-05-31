@@ -478,6 +478,8 @@ async function loadMatrix() {
                 <td>${v.last_hit_at || '-'}</td>
                 <td style="white-space:nowrap">
                     <button onclick="editVuln(${v.id}, '${esc(v.tag)}', ${v.weight}, '${esc(v.description || '')}')" class="secondary" style="padding:0.2rem 0.5rem;margin:0 0.2rem 0 0;font-size:0.8rem">编辑</button>
+                    <button onclick="resetVuln(${v.id})" class="secondary" style="padding:0.2rem 0.5rem;margin:0 0.2rem 0 0;font-size:0.8rem">重置</button>
+                    <button onclick="mergeVuln(${v.id}, '${esc(v.tag)}')" class="secondary" style="padding:0.2rem 0.5rem;margin:0 0.2rem 0 0;font-size:0.8rem">合并</button>
                     <button onclick="deleteVuln(${v.id})" class="secondary" style="padding:0.2rem 0.5rem;margin:0;font-size:0.8rem">删除</button>
                 </td>
             </tr>`;
@@ -519,6 +521,30 @@ async function deleteVuln(id) {
     try {
         await api(`/api/vulnerabilities/${id}`, { method: 'DELETE' });
         loadMatrix();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function resetVuln(id) {
+    if (!confirm('确定重置此弱点权重为 1.0？')) return;
+    try {
+        await api(`/api/vulnerabilities/${id}/reset`, { method: 'POST' });
+        loadMatrix();
+        toast('已重置');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function mergeVuln(sourceId, sourceTag) {
+    const targetTag = prompt(`将"${sourceTag}"合并到哪个弱点？输入目标弱点的标签名：`);
+    if (!targetTag) return;
+    // Find target by tag
+    try {
+        const vulns = await api('/api/vulnerabilities');
+        const target = vulns.find(v => v.tag === targetTag.trim());
+        if (!target) { toast('未找到目标弱点', 'error'); return; }
+        if (target.id === sourceId) { toast('不能合并到自身', 'error'); return; }
+        await api(`/api/vulnerabilities/merge?source_id=${sourceId}&target_id=${target.id}`, { method: 'POST' });
+        loadMatrix();
+        toast(`已合并到"${targetTag}"`);
     } catch (e) { toast(e.message, 'error'); }
 }
 
