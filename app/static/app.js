@@ -644,6 +644,17 @@ document.querySelectorAll('.plan-input textarea').forEach(ta => {
     });
 });
 
+// Global keyboard shortcuts
+document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const tabs = ['plans', 'review', 'matrix', 'stats', 'daily', 'calendar', 'settings'];
+    if (e.key >= '1' && e.key <= '7') {
+        e.preventDefault();
+        const tab = tabs[parseInt(e.key) - 1];
+        document.querySelector(`[data-tab="${tab}"]`).click();
+    }
+});
+
 // --- Weekly Summary ---
 async function generateWeeklySummary() {
     const btn = document.getElementById('weekly-btn');
