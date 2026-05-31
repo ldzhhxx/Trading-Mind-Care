@@ -67,14 +67,19 @@ class ReviewCreate(BaseModel):
 
 
 @router.get("")
-async def list_reviews(trade_date: str | None = None, limit: int = 20, offset: int = 0, q: str | None = None):
-    """List reviews with pagination and search support."""
+async def list_reviews(trade_date: str | None = None, limit: int = 20, offset: int = 0, q: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    """List reviews with pagination, search, and date range support."""
     db = await get_db()
     try:
         if trade_date:
             cursor = await db.execute(
                 "SELECT * FROM reviews WHERE trade_date = ? ORDER BY created_at DESC",
                 (trade_date,),
+            )
+        elif date_from and date_to:
+            cursor = await db.execute(
+                "SELECT * FROM reviews WHERE trade_date >= ? AND trade_date <= ? ORDER BY trade_date DESC LIMIT ? OFFSET ?",
+                (date_from, date_to, limit, offset),
             )
         elif q:
             cursor = await db.execute(
