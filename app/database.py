@@ -94,26 +94,18 @@ async def init_db():
             created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
         );
 
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version    INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        );
+
         CREATE INDEX IF NOT EXISTS idx_plans_date ON plans(trade_date);
         CREATE INDEX IF NOT EXISTS idx_reviews_date ON reviews(trade_date);
         CREATE INDEX IF NOT EXISTS idx_journal_date ON journal(trade_date);
         """)
 
-        # Migrations for existing databases
-        try:
-            await db.execute("ALTER TABLE plans ADD COLUMN done INTEGER NOT NULL DEFAULT 0")
-        except Exception:
-            pass  # column already exists
-
-        try:
-            await db.execute("ALTER TABLE reviews ADD COLUMN mood INTEGER")
-        except Exception:
-            pass  # column already exists
-
-        try:
-            await db.execute("ALTER TABLE vulnerability_matrix ADD COLUMN category TEXT NOT NULL DEFAULT '未分类'")
-        except Exception:
-            pass  # column already exists
+        # Run migrations
+        await _run_migrations(db)
 
         # Insert defaults if not exist
         defaults = [
@@ -125,6 +117,8 @@ async def init_db():
             ("last_decay_date", ""),
             ("last_notify_date", ""),
             ("decay_rate", "0.98"),
+            ("reminder_time", "20:00"),
+            ("schema_version", "3"),
         ]
         for key, value in defaults:
             await db.execute(
@@ -134,3 +128,36 @@ async def init_db():
         await db.commit()
     finally:
         await db.close()
+
+
+async def _run_migrations(db):
+    """Run pending schema migrations."""
+    # Get current version
+    try:
+        cursor = await db.execute("SELECT MAX(version) as v FROM schema_migrations")
+        row = await cursor.fetchone()
+        current = row["v"] or 0
+    except Exception:
+        current = 0
+
+    migrations = [
+        # Migration 1: Add mood column to reviews
+        (1, "ALTER TABLE reviews ADD COLUMN mood INTEGER"),
+        # Migration 2: Add category to vulnerability_matrix
+        (2, "ALTER TABLE vulnerability_matrix ADD COLUMN category TEXT NOT NULL DEFAULT '未分类'"),
+        # Migration 3: Add done column to plans
+        (3, "ALTER TABLE plans ADD COLUMN done INTEGER NOT NULL DEFAULT 0"),
+    ]
+
+    for version, sql in migrations:
+        if version <= current:
+            continue
+        try:
+            await db.execute(sql)
+        except Exception:
+            pass  # Column already exists from old migration style
+        await db.execute(
+            "INSERT OR REPLACE INTO schema_migrations (version) VALUES (?)", (version,)
+        )
+
+    await db.commit()

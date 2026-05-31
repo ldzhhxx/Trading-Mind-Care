@@ -16,6 +16,7 @@ class LLMConfig(BaseModel):
 class FeishuConfig(BaseModel):
     feishu_webhook: str
     notify_time: str = "08:30"
+    reminder_time: str = "20:00"
 
 
 class ExtraConfig(BaseModel):

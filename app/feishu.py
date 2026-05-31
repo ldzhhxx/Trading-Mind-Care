@@ -4,15 +4,18 @@ from datetime import date
 from app.database import get_db
 
 
-async def send_feishu_card(webhook_url: str, title: str, content: str) -> bool:
+async def send_feishu_card(webhook_url: str, title: str, content: str, extra_elements: list | None = None) -> bool:
     """Send a rich text card to Feishu. Returns True on success."""
     if not webhook_url:
         return False
+    elements = [{"tag": "markdown", "content": content}]
+    if extra_elements:
+        elements.extend(extra_elements)
     payload = {
         "msg_type": "interactive",
         "card": {
             "header": {"title": {"tag": "plain_text", "content": title}},
-            "elements": [{"tag": "markdown", "content": content}],
+            "elements": elements,
         },
     }
     try:

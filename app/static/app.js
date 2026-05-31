@@ -885,6 +885,7 @@ async function loadSettings() {
         document.getElementById('cfg-model-name').value = cfg.model_name || '';
         document.getElementById('cfg-feishu-webhook').value = cfg.feishu_webhook || '';
         document.getElementById('cfg-notify-time').value = cfg.notify_time || '08:30';
+        document.getElementById('cfg-reminder-time').value = cfg.reminder_time || '20:00';
         document.getElementById('cfg-intensity').value = cfg.critique_intensity || '3';
     } catch (e) { toast(e.message, 'error'); }
 }
@@ -930,6 +931,7 @@ async function saveFeishu() {
             body: JSON.stringify({
                 feishu_webhook: document.getElementById('cfg-feishu-webhook').value,
                 notify_time: document.getElementById('cfg-notify-time').value,
+                reminder_time: document.getElementById('cfg-reminder-time').value,
             }),
         });
         showResult('feishu-test-result', '✅ 已保存', true);
