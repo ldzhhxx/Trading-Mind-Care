@@ -7,7 +7,7 @@ from pydantic import BaseModel, field_validator
 from datetime import date
 from app.database import get_db
 from app.llm import call_llm, call_llm_stream
-from app.feishu import send_review_notification
+from app.feishu import send_review_notification, send_big_pnl_alert
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -248,6 +248,13 @@ async def create_review_stream(review: ReviewCreate):
             await send_review_notification(review.pnl, full_critique, new_tags)
         except Exception:
             pass
+
+        # Check for big PnL alert
+        if review.pnl is not None and review.pnl != 0:
+            try:
+                await send_big_pnl_alert(review.pnl)
+            except Exception:
+                pass
 
         yield f"data: {json.dumps({'done': True, 'review_id': review_id})}\n\n"
         yield "data: [DONE]\n\n"

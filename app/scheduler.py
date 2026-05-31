@@ -3,7 +3,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import date
 from app.database import get_db
-from app.feishu import send_daily_notification
+from app.feishu import send_daily_notification, send_plan_incomplete_alert
 
 scheduler = AsyncIOScheduler()
 
@@ -33,4 +33,6 @@ def start_scheduler():
     scheduler.add_job(send_daily_notification, CronTrigger(hour=8, minute=30), id="daily_notify", replace_existing=True)
     # Daily decay at midnight
     scheduler.add_job(daily_decay, CronTrigger(hour=0, minute=5), id="daily_decay", replace_existing=True)
+    # Plan incomplete reminder at 20:00
+    scheduler.add_job(send_plan_incomplete_alert, CronTrigger(hour=20, minute=0), id="plan_incomplete", replace_existing=True)
     scheduler.start()
