@@ -55,6 +55,20 @@ async def get_stats():
         trades_with_pnl = (await cursor.fetchone())["cnt"]
         win_rate = (wins / trades_with_pnl * 100) if trades_with_pnl > 0 else 0
 
+        # Max consecutive loss days
+        cursor = await db.execute(
+            "SELECT trade_date, SUM(pnl) as dp FROM reviews WHERE pnl IS NOT NULL GROUP BY trade_date ORDER BY trade_date"
+        )
+        all_days = await cursor.fetchall()
+        max_loss_streak = 0
+        cur_streak = 0
+        for row in all_days:
+            if row["dp"] < 0:
+                cur_streak += 1
+                max_loss_streak = max(max_loss_streak, cur_streak)
+            else:
+                cur_streak = 0
+
         # Top weaknesses
         cursor = await db.execute(
             "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
@@ -76,6 +90,7 @@ async def get_stats():
             "month_pnl": float(month_pnl),
             "streak_days": streak,
             "win_rate": round(win_rate, 1),
+            "max_loss_streak": max_loss_streak,
             "top_weaknesses": top_weaknesses,
             "pnl_trend": pnl_trend,
         }

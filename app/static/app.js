@@ -416,6 +416,7 @@ async function loadStats() {
                 <div class="stat-card"><div class="value">${data.week_reviews}</div><div class="label">本周复盘</div></div>
                 <div class="stat-card"><div class="value">${data.streak_days}🔥</div><div class="label">连续复盘天数</div></div>
                 <div class="stat-card"><div class="value">${data.win_rate}%</div><div class="label">胜率</div></div>
+                <div class="stat-card"><div class="value">${data.max_loss_streak}</div><div class="label">最大连亏天数</div></div>
             </div>`;
 
         // PnL trend bar chart
@@ -676,10 +677,34 @@ async function loadCalendar() {
                 else if (info.pnl < 0) { cls += ' loss'; badge = `<span class="cal-pnl negative">${info.pnl.toFixed(0)}</span>`; }
                 else { cls += ' neutral'; badge = `<span class="cal-pnl">0</span>`; }
             }
-            html += `<div class="${cls}"><span class="cal-day">${d}</span>${badge}</div>`;
+            html += `<div class="${cls}" onclick="calendarDayClick('${key}')" style="cursor:${info?'pointer':'default'}"><span class="cal-day">${d}</span>${badge}</div>`;
         }
         grid.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
+}
+
+function calendarDayClick(dateStr) {
+    // Switch to review tab and filter by date
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
+    document.querySelector('[data-tab="review"]').classList.add('active');
+    document.getElementById('tab-review').classList.add('active');
+    document.getElementById('review-search').value = '';
+    reviewPage = 0;
+    api(`/api/reviews?trade_date=${dateStr}`).then(reviews => {
+        const el = document.getElementById('review-history');
+        if (!reviews.length) { el.innerHTML = `<div class="empty-state"><div class="msg">${dateStr} 无复盘记录</div></div>`; return; }
+        el.innerHTML = reviews.map(r => {
+            const pnlClass = r.pnl > 0 ? 'pnl-pos' : r.pnl < 0 ? 'pnl-neg' : '';
+            const pnlText = r.pnl !== null ? `<span class="${pnlClass}">${r.pnl > 0 ? '+' : ''}${r.pnl}</span>` : '';
+            return `<div class="review-history-item" onclick="toggleReviewDetail(this, ${r.id})">
+                <div class="meta"><span class="date">${r.trade_date}</span>${pnlText}</div>
+                <div class="summary">${esc(r.emotion_log).slice(0, 80)}${r.emotion_log.length > 80 ? '...' : ''}</div>
+                <div class="critique-expand" id="review-detail-${r.id}"></div>
+            </div>`;
+        }).join('');
+        document.getElementById('review-pagination').innerHTML = '';
+    });
 }
 
 // Initial load
