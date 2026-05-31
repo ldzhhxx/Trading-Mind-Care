@@ -1,16 +1,21 @@
 /* Trading Mind Care - Frontend Logic */
 
 // Theme
+const THEMES = ['', 'light', 'ocean', 'forest', 'purple'];
+const THEME_ICONS = ['🌙', '☀️', '🌊', '🌲', '🔮'];
 function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'light' ? '' : 'light';
+    const current = document.documentElement.getAttribute('data-theme') || '';
+    const idx = (THEMES.indexOf(current) + 1) % THEMES.length;
+    const next = THEMES[idx];
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
-    document.getElementById('theme-btn').textContent = next === 'light' ? '☀️' : '🌙';
+    document.getElementById('theme-btn').textContent = THEME_ICONS[idx];
 }
 (function() {
-    const saved = localStorage.getItem('theme');
-    if (saved) { document.documentElement.setAttribute('data-theme', saved); document.getElementById('theme-btn').textContent = saved === 'light' ? '☀️' : '🌙'; }
+    const saved = localStorage.getItem('theme') || '';
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    const idx = THEMES.indexOf(saved);
+    if (idx >= 0) document.getElementById('theme-btn').textContent = THEME_ICONS[idx];
 })();
 
 // Tab switching

@@ -24,6 +24,42 @@
     --danger: #d32f2f;
 }
 
+[data-theme="ocean"] {
+    --bg: #0d1b2a;
+    --surface: #1b2838;
+    --surface2: #274060;
+    --accent: #48cae4;
+    --text: #e0fbfc;
+    --text-dim: #98c1d9;
+    --success: #06d6a0;
+    --warning: #ffd166;
+    --danger: #ef476f;
+}
+
+[data-theme="forest"] {
+    --bg: #1b2d1b;
+    --surface: #2d3e2d;
+    --surface2: #3e5c3e;
+    --accent: #8bc34a;
+    --text: #e8f5e9;
+    --text-dim: #a5d6a7;
+    --success: #66bb6a;
+    --warning: #ffca28;
+    --danger: #ef5350;
+}
+
+[data-theme="purple"] {
+    --bg: #1a1025;
+    --surface: #2d1b4e;
+    --surface2: #4a2c7a;
+    --accent: #bb86fc;
+    --text: #f3e5f5;
+    --text-dim: #ce93d8;
+    --success: #69f0ae;
+    --warning: #ffd54f;
+    --danger: #ff5252;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
