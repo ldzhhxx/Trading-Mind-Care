@@ -659,3 +659,36 @@ async def style_evolution():
         })
 
     return {"months": evolution}
+
+
+@router.get("/mood-trend")
+async def mood_trend():
+    """情绪趋势 — 追踪情绪随时间的变化."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, AVG(mood) as avg_mood, SUM(pnl) as daily_pnl "
+            "FROM reviews WHERE mood IS NOT NULL "
+            "GROUP BY trade_date ORDER BY trade_date DESC LIMIT 30"
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    rows.reverse()
+    # Detect mood streaks
+    if rows:
+        low_streak = 0
+        for r in reversed(rows):
+            if (r["avg_mood"] or 3) <= 2:
+                low_streak += 1
+            else:
+                break
+    else:
+        low_streak = 0
+
+    return {
+        "data": [{"date": r["trade_date"], "mood": round(r["avg_mood"], 1), "pnl": r["daily_pnl"]} for r in rows],
+        "low_mood_streak": low_streak,
+        "avg_mood": round(sum(r["avg_mood"] for r in rows) / len(rows), 2) if rows else 0,
+    }

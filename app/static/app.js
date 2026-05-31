@@ -1503,6 +1503,25 @@ async function loadAnalytics(type) {
             } else {
                 html += `<p style="color:var(--text-dim)">${data.message || '暂无数据'}</p>`;
             }
+        } else if (type === 'mood-trend') {
+            data = await api('/api/analytics/mood-trend');
+            const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
+            html = `<h3>情绪趋势（近30天）</h3>`;
+            if (data.data.length) {
+                html += `<div class="stats-grid" style="margin-bottom:1rem">
+                    <div class="stat-card"><div class="value">${moods[Math.round(data.avg_mood)] || data.avg_mood}</div><div class="label">平均情绪 ${data.avg_mood}/5</div></div>
+                    <div class="stat-card"><div class="value ${data.low_mood_streak > 2 ? 'negative' : ''}">${data.low_mood_streak}天</div><div class="label">连续低情绪</div></div>
+                </div>`;
+                html += `<div style="display:flex;gap:2px;align-items:center;height:80px;margin:1rem 0;border-bottom:1px solid var(--surface2)">`;
+                html += data.data.map(d => {
+                    const h = Math.max(8, (d.mood / 5) * 70);
+                    const color = d.mood >= 4 ? 'var(--success)' : d.mood <= 2 ? 'var(--danger)' : 'var(--warning)';
+                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" title="${d.date}: ${moods[Math.round(d.mood)]} (${d.mood}/5)${d.pnl != null ? ' PnL:' + d.pnl.toFixed(0) : ''}"><div style="width:70%;height:${h}px;background:${color};border-radius:2px;opacity:0.8"></div></div>`;
+                }).join('');
+                html += `</div><div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-dim)"><span>${data.data[0].date.slice(5)}</span><span>${data.data[data.data.length-1].date.slice(5)}</span></div>`;
+            } else {
+                html += `<p style="color:var(--text-dim)">暂无情绪数据，请在复盘时选择情绪状态</p>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
