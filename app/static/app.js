@@ -668,7 +668,10 @@ async function loadCalendar() {
         const grid = document.getElementById('calendar-grid');
         const firstDay = new Date(calYear, calMonth - 1, 1).getDay(); // 0=Sun
         const daysInMonth = new Date(calYear, calMonth, 0).getDate();
-        let html = '<div class="cal-header">日</div><div class="cal-header">一</div><div class="cal-header">二</div><div class="cal-header">三</div><div class="cal-header">四</div><div class="cal-header">五</div><div class="cal-header">六</div>';
+        // Monthly summary
+        const pnlCls = data.month_pnl >= 0 ? 'positive' : 'negative';
+        let html = `<div style="grid-column:1/-1;margin-bottom:0.5rem;font-size:0.85rem;color:var(--text-dim)">交易天数: ${data.trade_days} | 月盈亏: <span class="${pnlCls}">${data.month_pnl >= 0 ? '+' : ''}${data.month_pnl.toFixed(1)}</span></div>`;
+        html += '<div class="cal-header">日</div><div class="cal-header">一</div><div class="cal-header">二</div><div class="cal-header">三</div><div class="cal-header">四</div><div class="cal-header">五</div><div class="cal-header">六</div>';
         for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell empty"></div>';
         for (let d = 1; d <= daysInMonth; d++) {
             const key = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;

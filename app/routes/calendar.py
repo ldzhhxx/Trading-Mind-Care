@@ -26,6 +26,8 @@ async def get_calendar(year: int | None = None, month: int | None = None):
             (start, end),
         )
         days = {row["trade_date"]: {"pnl": row["daily_pnl"], "count": row["cnt"]} for row in await cursor.fetchall()}
-        return {"year": y, "month": m, "days": days}
+        total_pnl = sum(d["pnl"] or 0 for d in days.values())
+        trade_days = len(days)
+        return {"year": y, "month": m, "days": days, "month_pnl": total_pnl, "trade_days": trade_days}
     finally:
         await db.close()
