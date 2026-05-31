@@ -14,6 +14,7 @@ async def get_stats():
         today = date.today()
         week_ago = (today - timedelta(days=7)).isoformat()
         month_ago = (today - timedelta(days=30)).isoformat()
+        two_months_ago = (today - timedelta(days=60)).isoformat()
 
         # Total reviews & PnL
         cursor = await db.execute("SELECT COUNT(*) as cnt, COALESCE(SUM(pnl),0) as total FROM reviews")
@@ -34,6 +35,15 @@ async def get_stats():
             "SELECT COALESCE(SUM(pnl),0) as total FROM reviews WHERE trade_date >= ?", (month_ago,)
         )
         month_pnl = (await cursor.fetchone())["total"]
+
+        # Last month PnL (30-60 days ago)
+        cursor = await db.execute(
+            "SELECT COALESCE(SUM(pnl),0) as total, COUNT(*) as cnt FROM reviews WHERE trade_date >= ? AND trade_date < ?",
+            (two_months_ago, month_ago)
+        )
+        lm = await cursor.fetchone()
+        last_month_pnl = lm["total"]
+        last_month_trades = lm["cnt"]
 
         # Streak: consecutive days with reviews ending today
         streak = 0
@@ -150,6 +160,8 @@ async def get_stats():
             "mood_pnl_corr": mood_pnl_corr,
             "max_drawdown": round(max_dd, 1),
             "current_drawdown": round(current_dd, 1),
+            "last_month_pnl": float(last_month_pnl),
+            "last_month_trades": last_month_trades,
         }
     finally:
         await db.close()

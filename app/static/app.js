@@ -571,6 +571,7 @@ async function loadStats() {
                 <div class="stat-card"><div class="value ${pnlClass}">${data.total_pnl >= 0 ? '+' : ''}${data.total_pnl.toFixed(1)}</div><div class="label">累计盈亏</div></div>
                 <div class="stat-card"><div class="value ${weekClass}">${data.week_pnl >= 0 ? '+' : ''}${data.week_pnl.toFixed(1)}</div><div class="label">本周盈亏</div></div>
                 <div class="stat-card"><div class="value ${monthClass}">${data.month_pnl >= 0 ? '+' : ''}${data.month_pnl.toFixed(1)}</div><div class="label">本月盈亏</div></div>
+                <div class="stat-card"><div class="value ${data.last_month_pnl >= 0 ? 'positive' : 'negative'}">${data.last_month_pnl >= 0 ? '+' : ''}${data.last_month_pnl.toFixed(1)}</div><div class="label">上月盈亏</div></div>
                 <div class="stat-card"><div class="value">${data.week_reviews}</div><div class="label">本周复盘</div></div>
                 <div class="stat-card"><div class="value">${data.streak_days}🔥</div><div class="label">连续复盘天数</div></div>
                 <div class="stat-card"><div class="value">${data.win_rate}%</div><div class="label">胜率</div></div>
