@@ -1416,6 +1416,7 @@ async function loadAnalytics(type) {
             if (data.style === 'unknown') { html = '<p style="color:var(--text-dim)">暂无交易数据</p>'; }
             else {
                 const m = data.metrics;
+                const ra = data.risk_assessment || {};
                 const scoreColor = data.aggression_score > 70 ? 'var(--danger)' : data.aggression_score > 40 ? 'var(--warning)' : 'var(--success)';
                 html = `<h3>交易风格分析</h3>
                 <div style="text-align:center;margin:1.5rem 0">
@@ -1432,6 +1433,13 @@ async function loadAnalytics(type) {
                     <div class="stat-card"><div class="value">${m.volatility}</div><div class="label">波动率</div></div>
                     <div class="stat-card"><div class="value">${m.risk_reward}</div><div class="label">盈亏比</div></div>
                     <div class="stat-card"><div class="value">${m.avg_abs_pnl}</div><div class="label">平均绝对盈亏</div></div>
+                </div>
+                <h4 style="margin-top:1.5rem">⚠️ 风险管理评估</h4>
+                <div class="stats-grid" style="margin-top:0.8rem">
+                    <div class="stat-card"><div class="value ${ra.stop_loss_rate >= 70 ? 'positive' : 'negative'}">${ra.stop_loss_rate}%</div><div class="label">止损纪律率</div></div>
+                    <div class="stat-card"><div class="value ${ra.position_control_rate >= 70 ? 'positive' : 'negative'}">${ra.position_control_rate}%</div><div class="label">仓位控制率</div></div>
+                    <div class="stat-card"><div class="value ${ra.avg_recovery_pnl >= 0 ? 'positive' : 'negative'}">${ra.avg_recovery_pnl >= 0 ? '+' : ''}${ra.avg_recovery_pnl}</div><div class="label">连亏后平均表现</div></div>
+                    <div class="stat-card"><div class="value">${ra.risk_score}/100</div><div class="label">风控综合评分</div></div>
                 </div>`;
             }
         } else if (type === 'periodicity') {

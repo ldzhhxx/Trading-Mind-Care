@@ -502,19 +502,20 @@ async def ai_behavior_patterns():
 
 @router.get("/trading-style")
 async def trading_style_analysis():
-    """交易风格分析：激进 vs 保守."""
+    """交易风格分析：激进 vs 保守 + 风险管理评估."""
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT pnl FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date"
+            "SELECT pnl, trade_date FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date"
         )
-        pnls = [r["pnl"] for r in await cursor.fetchall()]
+        rows = [dict(r) for r in await cursor.fetchall()]
     finally:
         await db.close()
 
-    if not pnls:
-        return {"style": "unknown", "metrics": {}}
+    if not rows:
+        return {"style": "unknown", "metrics": {}, "risk_assessment": {}}
 
+    pnls = [r["pnl"] for r in rows]
     abs_pnls = [abs(p) for p in pnls]
     avg_abs = sum(abs_pnls) / len(abs_pnls)
     max_win = max(pnls)
@@ -531,6 +532,22 @@ async def trading_style_analysis():
     aggression_score = min(100, int((volatility / (avg_abs + 1)) * 50 + (abs(max_loss) / (avg_abs + 1)) * 20))
     style = "激进型" if aggression_score > 70 else "均衡型" if aggression_score > 40 else "保守型"
 
+    # Risk management assessment
+    # Stop-loss discipline: % of losses that are within 1.5x avg loss
+    controlled_losses = sum(1 for p in losses if abs(p) <= avg_loss * 1.5) if losses else 0
+    stop_loss_rate = round(controlled_losses / len(losses) * 100, 1) if losses else 100
+
+    # Position sizing: % of trades within 2x avg absolute PnL
+    controlled_trades = sum(1 for p in pnls if abs(p) <= avg_abs * 2)
+    position_control_rate = round(controlled_trades / len(pnls) * 100, 1) if pnls else 100
+
+    # Consecutive loss recovery: avg PnL after 2+ consecutive losses
+    recovery_pnls = []
+    for i in range(2, len(pnls)):
+        if pnls[i-1] < 0 and pnls[i-2] < 0:
+            recovery_pnls.append(pnls[i])
+    avg_recovery = round(sum(recovery_pnls) / len(recovery_pnls), 1) if recovery_pnls else 0
+
     return {
         "style": style,
         "aggression_score": aggression_score,
@@ -543,6 +560,12 @@ async def trading_style_analysis():
             "win_count": len(wins),
             "loss_count": len(losses),
             "total_trades": len(pnls),
+        },
+        "risk_assessment": {
+            "stop_loss_rate": stop_loss_rate,
+            "position_control_rate": position_control_rate,
+            "avg_recovery_pnl": avg_recovery,
+            "risk_score": round((stop_loss_rate + position_control_rate) / 2, 1),
         },
     }
 
