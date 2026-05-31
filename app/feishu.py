@@ -131,6 +131,25 @@ async def build_daily_message() -> tuple[str, str]:
     except Exception:
         pass
 
+    # Add trader level
+    try:
+        db4 = await get_db()
+        try:
+            cursor = await db4.execute("SELECT SUM(xp) as total_xp FROM trader_xp")
+            xp_row = await cursor.fetchone()
+            total_xp = max(0, (xp_row["total_xp"] or 0))
+            levels = [(0,"新手","🌱"),(100,"学徒","📘"),(300,"战士","⚔️"),(600,"修行者","🧘"),(1000,"大师","🏅"),(1500,"哲人","🎓"),(2500,"智者","👑")]
+            level_name = levels[0][1]
+            level_icon = levels[0][2]
+            for threshold, name, icon in levels:
+                if total_xp >= threshold:
+                    level_name, level_icon = name, icon
+            lines.append(f"\n{level_icon} **{level_name}** ({total_xp} XP)")
+        finally:
+            await db4.close()
+    except Exception:
+        pass
+
     return title, "\n".join(lines)
 
 

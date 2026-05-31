@@ -82,6 +82,18 @@ async def get_dashboard():
         )
         week_pnl = (await cursor.fetchone())["pnl"] or 0
 
+        # Trader level
+        cursor = await db.execute("SELECT SUM(xp) as total_xp FROM trader_xp")
+        xp_row = await cursor.fetchone()
+        total_xp = max(0, (xp_row["total_xp"] or 0))
+
+        # Today's violations
+        cursor = await db.execute(
+            "SELECT COUNT(*) as cnt FROM discipline_violations WHERE trade_date = ?",
+            (today.isoformat(),)
+        )
+        today_violations = (await cursor.fetchone())["cnt"]
+
         return {
             "date": today.isoformat(),
             "plan_total": plan_total,
@@ -93,6 +105,8 @@ async def get_dashboard():
             "week_pnl": round(week_pnl, 1),
             "top_weakness": top_vuln["tag"] if top_vuln else None,
             "top_weakness_weight": round(top_vuln["weight"], 1) if top_vuln else 0,
+            "total_xp": total_xp,
+            "today_violations": today_violations,
         }
     finally:
         await db.close()
