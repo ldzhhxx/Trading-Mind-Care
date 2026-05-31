@@ -553,6 +553,8 @@ async function loadStats() {
                 <div class="stat-card"><div class="value positive">+${data.avg_win}</div><div class="label">平均盈利</div></div>
                 <div class="stat-card"><div class="value negative">${data.avg_loss}</div><div class="label">平均亏损</div></div>
                 <div class="stat-card"><div class="value">${data.plan_rate}%</div><div class="label">计划执行率</div></div>
+                <div class="stat-card"><div class="value negative">-${data.max_drawdown}</div><div class="label">最大回撤</div></div>
+                <div class="stat-card"><div class="value ${data.current_drawdown > 0 ? 'negative' : ''}">${data.current_drawdown > 0 ? '-' + data.current_drawdown : '0'}</div><div class="label">当前回撤</div></div>
             </div>`;
 
         // PnL trend bar chart

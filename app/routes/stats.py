@@ -113,6 +113,24 @@ async def get_stats():
         )
         pnl_trend = [dict(r) for r in await cursor.fetchall()]
 
+        # Drawdown analysis (cumulative equity curve)
+        cursor = await db.execute(
+            "SELECT trade_date, SUM(pnl) as daily_pnl FROM reviews WHERE pnl IS NOT NULL GROUP BY trade_date ORDER BY trade_date"
+        )
+        all_daily = await cursor.fetchall()
+        cumulative = 0
+        peak = 0
+        max_dd = 0
+        current_dd = 0
+        for row in all_daily:
+            cumulative += row["daily_pnl"] or 0
+            if cumulative > peak:
+                peak = cumulative
+            dd = peak - cumulative
+            if dd > max_dd:
+                max_dd = dd
+        current_dd = peak - cumulative if peak > cumulative else 0
+
         return {
             "review_count": review_count,
             "total_pnl": float(total_pnl),
@@ -130,6 +148,8 @@ async def get_stats():
             "pnl_trend": pnl_trend,
             "mood_trend": mood_trend,
             "mood_pnl_corr": mood_pnl_corr,
+            "max_drawdown": round(max_dd, 1),
+            "current_drawdown": round(current_dd, 1),
         }
     finally:
         await db.close()
