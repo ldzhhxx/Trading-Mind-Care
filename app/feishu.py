@@ -119,6 +119,18 @@ async def build_daily_message() -> tuple[str, str]:
     if streak >= 3:
         lines.append(f"\n🔥 **你已连续复盘 {streak} 天，不要断！**")
 
+    # Add risk score
+    try:
+        from app.routes.analytics import daily_risk_score
+        risk = await daily_risk_score()
+        if risk["score"] >= 30:
+            lines.append(f"\n**⚡ 今日风险指数: {risk['score']}/100 {risk['level']}**")
+            if risk["factors"]:
+                for f in risk["factors"][:2]:
+                    lines.append(f"  - {f}")
+    except Exception:
+        pass
+
     return title, "\n".join(lines)
 
 

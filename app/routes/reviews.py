@@ -456,3 +456,63 @@ async def _extract_weaknesses(db, emotion_log: str, critique: str) -> list[str]:
         """, (tag, severity, now, tag, severity, now))
     await db.commit()
     return tags
+
+
+@router.post("/check-rules")
+async def check_rules_violation(content: dict):
+    """AI 自动检测复盘内容是否违反了交易纪律."""
+    emotion_log = content.get("emotion_log", "")
+    pnl = content.get("pnl")
+
+    if not emotion_log.strip():
+        return {"violations": []}
+
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT id, rule, category FROM trade_rules WHERE active = 1")
+        rules = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if not rules:
+        return {"violations": [], "message": "未设置交易纪律"}
+
+    from app.llm import call_llm
+    import json
+
+    rules_text = "\n".join(f"{i+1}. [{r['category']}] {r['rule']}" for i, r in enumerate(rules))
+
+    messages = [
+        {"role": "system", "content": f"""你是交易纪律检查官。根据交易员的复盘内容，判断是否违反了以下纪律规则。
+
+交易纪律规则：
+{rules_text}
+
+返回严格JSON数组，每个元素：{{"rule_index": 规则序号(从1开始), "violated": true/false, "evidence": "违反证据(从复盘中引用)"}}
+只返回可能违反的规则（violated=true的）。如果没有违反，返回空数组 []。只返回JSON。"""},
+        {"role": "user", "content": f"盈亏: {pnl}\n复盘内容: {emotion_log[:800]}"},
+    ]
+
+    try:
+        raw = await call_llm(messages)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
+        violations = json.loads(raw)
+        if not isinstance(violations, list):
+            return {"violations": []}
+
+        # Enrich with rule details
+        result = []
+        for v in violations:
+            if v.get("violated"):
+                idx = v.get("rule_index", 0) - 1
+                if 0 <= idx < len(rules):
+                    result.append({
+                        "rule": rules[idx]["rule"],
+                        "category": rules[idx]["category"],
+                        "evidence": v.get("evidence", ""),
+                    })
+        return {"violations": result}
+    except Exception:
+        return {"violations": []}
