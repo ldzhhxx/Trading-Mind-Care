@@ -12,6 +12,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         else if (tab === 'review') loadReviews();
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
+        else if (tab === 'daily') loadDailyReport();
         else if (tab === 'settings') loadSettings();
     });
 });
@@ -429,6 +430,41 @@ async function loadStats() {
             }).join('');
         } else {
             html += '<div class="empty-state"><div class="icon">📈</div><div class="msg">暂无统计数据</div></div>';
+        }
+
+        el.innerHTML = html;
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Daily Report ---
+async function loadDailyReport() {
+    const dateInput = document.getElementById('daily-date-input');
+    if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    const d = dateInput.value;
+    try {
+        const data = await api(`/api/daily-report?trade_date=${d}`);
+        const el = document.getElementById('daily-content');
+        const pnlClass = data.total_pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        let html = `<div style="margin-bottom:1rem;font-size:0.9rem;color:var(--text-dim)">日期：<strong style="color:var(--text)">${d}</strong> | 总盈亏：<span class="${pnlClass}" style="font-weight:600">${data.total_pnl >= 0 ? '+' : ''}${data.total_pnl.toFixed(1)}</span></div>`;
+
+        html += '<h3 style="margin:1rem 0 0.5rem">📋 计划</h3>';
+        if (data.plans.length) {
+            html += '<ul>' + data.plans.map(p => `<li>${esc(p.content)} <small style="color:var(--text-dim)">(${p.plan_type})</small></li>`).join('') + '</ul>';
+        } else {
+            html += '<p style="color:var(--text-dim)">当日无计划</p>';
+        }
+
+        html += '<h3 style="margin:1rem 0 0.5rem">🔥 复盘</h3>';
+        if (data.reviews.length) {
+            data.reviews.forEach(r => {
+                html += `<div style="background:var(--surface);padding:0.8rem 1rem;border-radius:var(--radius);margin-bottom:0.5rem">`;
+                if (r.pnl !== null) html += `<div style="margin-bottom:0.3rem"><strong>盈亏：</strong><span class="${r.pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${r.pnl >= 0 ? '+' : ''}${r.pnl}</span></div>`;
+                html += `<div style="margin-bottom:0.5rem"><strong>倾诉：</strong>${esc(r.emotion_log)}</div>`;
+                if (r.ai_critique) html += `<div style="border-top:1px solid var(--surface2);padding-top:0.5rem;color:var(--accent)"><strong>AI 拷打：</strong>${esc(r.ai_critique)}</div>`;
+                html += '</div>';
+            });
+        } else {
+            html += '<p style="color:var(--text-dim)">当日无复盘</p>';
         }
 
         el.innerHTML = html;

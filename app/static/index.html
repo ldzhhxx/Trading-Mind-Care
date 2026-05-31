@@ -14,6 +14,7 @@
             <button class="tab" data-tab="review">🔥 复盘</button>
             <button class="tab" data-tab="matrix">📊 弱点矩阵</button>
             <button class="tab" data-tab="stats">📈 统计</button>
+            <button class="tab" data-tab="daily">📅 日报</button>
             <button class="tab" data-tab="settings">⚙️ 设置</button>
         </nav>
     </header>
@@ -94,6 +95,16 @@
         <section id="tab-stats" class="tab-content">
             <h2 style="margin-bottom:1rem">统计面板</h2>
             <div id="stats-content"></div>
+        </section>
+
+        <!-- Daily Report Tab -->
+        <section id="tab-daily" class="tab-content">
+            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+                <h2>日报</h2>
+                <input type="date" id="daily-date-input" style="background:var(--surface);border:1px solid var(--surface2);color:var(--text);padding:0.4rem 0.6rem;border-radius:var(--radius);font-size:0.9rem">
+                <button onclick="loadDailyReport()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">查看</button>
+            </div>
+            <div id="daily-content"></div>
         </section>
 
         <!-- Settings Tab -->
