@@ -6,7 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import date, datetime
 from app.database import get_db, get_db_path
-from app.feishu import send_daily_notification, send_plan_incomplete_alert
+from app.feishu import send_daily_notification, send_plan_incomplete_alert, send_no_review_alert
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -67,13 +67,10 @@ async def daily_auto_backup():
 
 def start_scheduler():
     """Start background scheduler for daily tasks."""
-    # Daily notification at configured time (default 8:30)
     scheduler.add_job(send_daily_notification, CronTrigger(hour=8, minute=30), id="daily_notify", replace_existing=True)
-    # Daily decay at midnight
     scheduler.add_job(daily_decay, CronTrigger(hour=0, minute=5), id="daily_decay", replace_existing=True)
-    # Plan incomplete reminder at 20:00
     scheduler.add_job(send_plan_incomplete_alert, CronTrigger(hour=20, minute=0), id="plan_incomplete", replace_existing=True)
-    # Daily auto-backup at 23:55
     scheduler.add_job(daily_auto_backup, CronTrigger(hour=23, minute=55), id="daily_backup", replace_existing=True)
+    scheduler.add_job(send_no_review_alert, CronTrigger(hour=21, minute=0), id="no_review_alert", replace_existing=True)
     scheduler.start()
     logger.info("Scheduler started")

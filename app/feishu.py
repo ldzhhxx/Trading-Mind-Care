@@ -271,3 +271,48 @@ async def send_big_pnl_alert(pnl: float):
             title = "💸 大额亏损预警"
             body = f"今日亏损 **{pnl}**，是平均水平的 **{abs(pnl)/avg:.1f}x**。\n\n🛑 请立即检查：\n- 是否止损失效？\n- 是否仓位过重？\n- 是否需要暂停交易？\n\n**保护本金是第一优先级。**"
         await send_feishu_card(webhook, title, body)
+
+
+async def send_no_review_alert():
+    """Send alert if user hasn't reviewed for 2+ days."""
+    from datetime import timedelta
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'feishu_webhook'")
+        row = await cursor.fetchone()
+        webhook = row["value"] if row else ""
+        if not webhook:
+            return
+
+        cursor = await db.execute("SELECT MAX(trade_date) as last_date FROM reviews")
+        row = await cursor.fetchone()
+        if not row or not row["last_date"]:
+            return
+
+        last_review = date.fromisoformat(row["last_date"])
+        gap = (date.today() - last_review).days
+        if gap < 2:
+            return
+    finally:
+        await db.close()
+
+    title = "⏰ 复盘断档提醒"
+    body = f"你已经 **{gap} 天** 没有复盘了！\n\n习惯一旦中断，重建的成本是维持的 3 倍。\n\n即使今天没有交易，也可以：\n- 回顾本周的交易\n- 写一篇市场观察日记\n- 检查弱点矩阵的变化\n\n**不要让连续记录归零。**"
+    await send_feishu_card(webhook, title, body)
+
+
+async def send_milestone_notification(milestone: str):
+    """Send celebration notification when user hits a milestone."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'feishu_webhook'")
+        row = await cursor.fetchone()
+        webhook = row["value"] if row else ""
+        if not webhook:
+            return
+    finally:
+        await db.close()
+
+    title = "🏆 里程碑达成！"
+    body = f"**恭喜！** {milestone}\n\n坚持就是最大的优势。继续保持！"
+    await send_feishu_card(webhook, title, body)

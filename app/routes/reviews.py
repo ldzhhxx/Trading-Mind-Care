@@ -7,7 +7,7 @@ from pydantic import BaseModel, field_validator
 from datetime import date
 from app.database import get_db
 from app.llm import call_llm, call_llm_stream
-from app.feishu import send_review_notification, send_big_pnl_alert
+from app.feishu import send_review_notification, send_big_pnl_alert, send_milestone_notification
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -359,6 +359,28 @@ async def create_review_stream(review: ReviewCreate):
                 await send_big_pnl_alert(review.pnl)
             except Exception:
                 pass
+
+        # Check milestones
+        try:
+            from datetime import timedelta
+            db3 = await get_db()
+            try:
+                streak = 0
+                d = date.today()
+                while True:
+                    cursor = await db3.execute("SELECT COUNT(*) as cnt FROM reviews WHERE trade_date = ?", (d.isoformat(),))
+                    if (await cursor.fetchone())["cnt"] > 0:
+                        streak += 1
+                        d -= timedelta(days=1)
+                    else:
+                        break
+            finally:
+                await db3.close()
+            milestones = {7: "连续复盘 7 天 🌟", 14: "连续复盘 14 天 ⭐", 30: "连续复盘 30 天 🏅", 60: "连续复盘 60 天 🥇"}
+            if streak in milestones:
+                await send_milestone_notification(milestones[streak])
+        except Exception:
+            pass
 
         yield f"data: {json.dumps({'done': True, 'review_id': review_id})}\n\n"
         yield "data: [DONE]\n\n"
