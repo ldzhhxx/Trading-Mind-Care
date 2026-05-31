@@ -34,6 +34,16 @@ async def daily_decay():
             "INSERT OR REPLACE INTO sys_config (key, value) VALUES ('last_decay_date', ?)",
             (today,),
         )
+
+        # Record weight history for decay visualization
+        cursor = await db.execute("SELECT tag, weight FROM vulnerability_matrix WHERE weight > 0.1")
+        vulns = await cursor.fetchall()
+        for v in vulns:
+            await db.execute(
+                "INSERT INTO vuln_weight_history (tag, weight, recorded_at) VALUES (?, ?, ?)",
+                (v["tag"], v["weight"], today),
+            )
+
         await db.commit()
         logger.info(f"Daily decay applied (rate={decay_rate})")
     except Exception as e:

@@ -41,6 +41,7 @@ class ReviewCreate(BaseModel):
     pnl: float | None = None
     emotion_log: str
     mood: int | None = None  # 1-5 scale: 1=very bad, 5=very good
+    context_tags: str = ""  # comma-separated tags like "突破行情,趋势交易"
 
     @field_validator("emotion_log")
     @classmethod
@@ -408,11 +409,17 @@ async def quick_review(review: ReviewCreate):
     db = await get_db()
     try:
         cursor = await db.execute(
-            "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood) VALUES (?, ?, ?, ?, ?)",
-            (trade_date, review.pnl, review.emotion_log, None, review.mood),
+            "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique, mood, context_tags) VALUES (?, ?, ?, ?, ?, ?)",
+            (trade_date, review.pnl, review.emotion_log, None, review.mood, review.context_tags),
         )
         review_id = cursor.lastrowid
         await db.commit()
+        # Grant XP for quick review
+        try:
+            from app.routes.discipline import _add_xp
+            await _add_xp(db, "quick_review", 8, trade_date)
+        except Exception:
+            pass
         return {"id": review_id, "quick": True, "message": "快速复盘已保存，可稍后重新拷打获取AI点评"}
     finally:
         await db.close()

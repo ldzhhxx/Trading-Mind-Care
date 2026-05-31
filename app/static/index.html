@@ -121,6 +121,19 @@
                     <button type="button" class="mood-btn" data-mood="5" onclick="selectMood(5)" title="非常好">😄</button>
                 </div>
                 <label>交易倾诉</label>
+                <div style="margin-bottom:0.5rem">
+                    <label style="font-size:0.8rem;color:var(--text-dim)">交易情境标签（可选）</label>
+                    <div id="context-tags-selector" style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem">
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'突破行情')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">突破行情</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'震荡行情')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">震荡行情</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'趋势交易')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">趋势交易</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'逆势交易')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">逆势交易</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'重仓')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">重仓</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'轻仓试探')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">轻仓试探</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'数据行情')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">数据行情</button>
+                        <button type="button" class="secondary context-tag-btn" onclick="toggleContextTag(this,'情绪化交易')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">情绪化交易</button>
+                    </div>
+                </div>
                 <div style="margin-bottom:0.5rem;display:flex;gap:0.3rem;align-items:center">
                     <select id="review-template-select" onchange="applyReviewTemplate()" style="flex:1;padding:0.3rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.8rem">
                         <option value="">📝 选择复盘模板...</option>
@@ -273,6 +286,7 @@
                 <button onclick="loadAnalytics('mood-trend')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">情绪趋势</button>
                 <button onclick="loadAnalytics('correlation')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🕸️ 弱点关联</button>
                 <button onclick="loadAnalytics('heatmap')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🌡️ 情绪热力图</button>
+                <button onclick="loadAnalytics('decay')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">📉 弱点衰减</button>
             </div>
             <div id="analytics-content"></div>
             <div style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">

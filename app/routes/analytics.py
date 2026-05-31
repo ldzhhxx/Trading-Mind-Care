@@ -861,6 +861,46 @@ async def review_score_trend():
     return {"data": rows, "avg_score": round(avg, 1)}
 
 
+@router.get("/vuln-decay-history")
+async def vuln_decay_history(tag: str | None = None):
+    """弱点权重衰减历史 — 可视化弱点随时间的变化."""
+    db = await get_db()
+    try:
+        if tag:
+            cursor = await db.execute(
+                "SELECT tag, weight, recorded_at FROM vuln_weight_history WHERE tag = ? ORDER BY recorded_at DESC LIMIT 60",
+                (tag,),
+            )
+        else:
+            # Get top 5 vulnerabilities
+            cursor = await db.execute(
+                "SELECT tag FROM vulnerability_matrix ORDER BY weight DESC LIMIT 5"
+            )
+            top_tags = [r["tag"] for r in await cursor.fetchall()]
+            if not top_tags:
+                return {"data": {}}
+            placeholders = ",".join("?" * len(top_tags))
+            cursor = await db.execute(
+                f"SELECT tag, weight, recorded_at FROM vuln_weight_history WHERE tag IN ({placeholders}) ORDER BY recorded_at DESC LIMIT 200",
+                top_tags,
+            )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    # Group by tag
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for r in rows:
+        grouped[r["tag"]].append({"date": r["recorded_at"], "weight": round(r["weight"], 3)})
+
+    # Reverse each list to chronological order
+    for tag in grouped:
+        grouped[tag].reverse()
+
+    return {"data": dict(grouped)}
+
+
 @router.post("/score-review")
 async def score_review(content: dict):
     """AI 评估复盘质量 (1-10分)."""

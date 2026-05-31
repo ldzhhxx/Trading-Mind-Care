@@ -348,6 +348,19 @@ function selectMood(val) {
     });
 }
 
+let selectedContextTags = new Set();
+function toggleContextTag(btn, tag) {
+    if (selectedContextTags.has(tag)) {
+        selectedContextTags.delete(tag);
+        btn.style.background = '';
+        btn.style.color = '';
+    } else {
+        selectedContextTags.add(tag);
+        btn.style.background = 'var(--accent)';
+        btn.style.color = '#fff';
+    }
+}
+
 function insertPrompt(text) {
     const input = document.getElementById('emotion-input');
     const pos = input.selectionStart;
@@ -381,7 +394,7 @@ async function submitReview() {
         const resp = await fetch('/api/reviews/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood }),
+            body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood, context_tags: [...selectedContextTags].join(',') }),
         });
 
         const reader = resp.body.getReader();
@@ -1371,11 +1384,13 @@ async function quickReview() {
     const trade_date = document.getElementById('review-date-input').value || null;
     const mood = selectedMood;
     try {
-        const res = await api('/api/reviews/quick', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood }) });
+        const res = await api('/api/reviews/quick', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion, trade_date, mood, context_tags: [...selectedContextTags].join(',') }) });
         toast('⚡ 快速复盘已保存');
         document.getElementById('emotion-input').value = '';
         document.getElementById('pnl-input').value = '';
         selectedMood = null;
+        selectedContextTags.clear();
+        document.querySelectorAll('.context-tag-btn').forEach(b => { b.style.background = ''; b.style.color = ''; });
         document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
         localStorage.removeItem('review_draft');
         loadReviews();
@@ -1648,6 +1663,30 @@ async function loadAnalytics(type) {
                 html += `</div>`;
             } else {
                 html += `<p style="color:var(--text-dim)">暂无情绪数据</p>`;
+            }
+        } else if (type === 'decay') {
+            data = await api('/api/analytics/vuln-decay-history');
+            html = `<h3>📉 弱点权重衰减曲线</h3>`;
+            const tags = Object.keys(data.data || {});
+            if (tags.length) {
+                html += `<p class="hint" style="margin-bottom:1rem">展示弱点权重随时间的衰减趋势（每日自动衰减）</p>`;
+                const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
+                for (let ti = 0; ti < tags.length; ti++) {
+                    const tag = tags[ti];
+                    const points = data.data[tag];
+                    if (!points.length) continue;
+                    const maxW = Math.max(...points.map(p => p.weight), 0.1);
+                    const color = colors[ti % colors.length];
+                    html += `<div style="margin-bottom:1rem"><strong style="color:${color}">${tag}</strong> <span style="font-size:0.75rem;color:var(--text-dim)">(当前: ${points[points.length-1].weight})</span>`;
+                    html += `<div style="display:flex;align-items:flex-end;gap:1px;height:40px;margin-top:0.3rem;border-bottom:1px solid var(--surface2)">`;
+                    html += points.slice(-30).map(p => {
+                        const h = Math.max(2, (p.weight / maxW) * 35);
+                        return `<div style="flex:1;height:${h}px;background:${color};border-radius:1px;opacity:0.7" title="${p.date}: ${p.weight}"></div>`;
+                    }).join('');
+                    html += `</div></div>`;
+                }
+            } else {
+                html += `<p style="color:var(--text-dim)">暂无衰减历史数据（需要至少一天的数据积累）</p>`;
             }
         }
         el.innerHTML = html;

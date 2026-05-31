@@ -204,6 +204,16 @@ async def _run_migrations(db):
         (20, "CREATE INDEX IF NOT EXISTS idx_xp_date ON trader_xp(trade_date)"),
         # Migration 21: Review follow-up questions (v9.0)
         (21, "ALTER TABLE reviews ADD COLUMN followup TEXT"),
+        # Migration 22: Review context tags (v9.0)
+        (22, "ALTER TABLE reviews ADD COLUMN context_tags TEXT NOT NULL DEFAULT ''"),
+        # Migration 23: Vulnerability weight history (v9.0)
+        (23, """CREATE TABLE IF NOT EXISTS vuln_weight_history (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            tag         TEXT NOT NULL,
+            weight      REAL NOT NULL,
+            recorded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )"""),
+        (24, "CREATE INDEX IF NOT EXISTS idx_vuln_history_tag ON vuln_weight_history(tag)"),
     ]
 
     for version, sql in migrations:
