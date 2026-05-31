@@ -320,3 +320,44 @@ async def import_all(file: UploadFile = File(...)):
         await db.close()
 
     return {"imported": counts}
+
+
+@router.get("/health")
+async def health_check():
+    """System health check with DB stats."""
+    import os
+    from app.database import get_db_path
+    db_path = get_db_path()
+    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM reviews")
+        review_count = (await cursor.fetchone())["cnt"]
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM plans")
+        plan_count = (await cursor.fetchone())["cnt"]
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM journal")
+        journal_count = (await cursor.fetchone())["cnt"]
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM vulnerability_matrix")
+        vuln_count = (await cursor.fetchone())["cnt"]
+        cursor = await db.execute("PRAGMA integrity_check")
+        integrity = (await cursor.fetchone())[0]
+    finally:
+        await db.close()
+
+    # Backup status
+    backup_dir = os.path.join(os.path.dirname(db_path), "backups")
+    backup_count = len([f for f in os.listdir(backup_dir) if f.endswith(".db")]) if os.path.isdir(backup_dir) else 0
+
+    return {
+        "status": "healthy" if integrity == "ok" else "degraded",
+        "db_size_mb": round(db_size / 1024 / 1024, 2),
+        "db_integrity": integrity,
+        "records": {
+            "reviews": review_count,
+            "plans": plan_count,
+            "journal": journal_count,
+            "vulnerabilities": vuln_count,
+        },
+        "backups": backup_count,
+    }
