@@ -610,3 +610,52 @@ async def ai_generate_rules():
         return {"rules": rules if isinstance(rules, list) else []}
     except Exception as e:
         return {"rules": [], "error": str(e)}
+
+
+@router.get("/style-evolution")
+async def style_evolution():
+    """交易风格演变趋势 — 按月追踪风格变化."""
+    from collections import defaultdict
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, pnl FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date"
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if len(rows) < 5:
+        return {"months": [], "message": "数据不足，至少需要5条记录"}
+
+    # Group by month
+    monthly = defaultdict(list)
+    for r in rows:
+        month = r["trade_date"][:7]
+        monthly[month].append(r["pnl"])
+
+    evolution = []
+    for month in sorted(monthly.keys()):
+        pnls = monthly[month]
+        if len(pnls) < 2:
+            continue
+        mean = sum(pnls) / len(pnls)
+        volatility = (sum((p - mean)**2 for p in pnls) / len(pnls)) ** 0.5
+        wins = sum(1 for p in pnls if p > 0)
+        avg_win = sum(p for p in pnls if p > 0) / wins if wins else 0
+        losses = [p for p in pnls if p < 0]
+        avg_loss = abs(sum(losses) / len(losses)) if losses else 0
+        rr = avg_win / avg_loss if avg_loss > 0 else 0
+        aggression = min(100, int(volatility / (abs(mean) + 1) * 50))
+
+        evolution.append({
+            "month": month,
+            "trades": len(pnls),
+            "total_pnl": round(sum(pnls), 1),
+            "win_rate": round(wins / len(pnls) * 100, 1),
+            "volatility": round(volatility, 1),
+            "risk_reward": round(rr, 2),
+            "aggression": aggression,
+        })
+
+    return {"months": evolution}

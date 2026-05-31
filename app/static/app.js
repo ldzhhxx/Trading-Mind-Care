@@ -1480,6 +1480,29 @@ async function loadAnalytics(type) {
                 html += data.monthly.map(m => `<div class="stat-card"><div class="value ${m.pnl >= 0 ? 'positive' : 'negative'}">${m.pnl >= 0 ? '+' : ''}${m.pnl}</div><div class="label">${m.month} (${m.days}天)</div></div>`).join('');
                 html += `</div>`;
             }
+        } else if (type === 'evolution') {
+            data = await api('/api/analytics/style-evolution');
+            html = `<h3>交易风格演变趋势</h3>`;
+            if (data.months && data.months.length) {
+                html += `<p class="hint" style="margin-bottom:1rem">追踪你的交易风格如何随时间变化</p>`;
+                html += `<table style="width:100%;font-size:0.85rem"><thead><tr><th>月份</th><th>交易次数</th><th>总盈亏</th><th>胜率</th><th>盈亏比</th><th>波动率</th><th>激进度</th></tr></thead><tbody>`;
+                for (const m of data.months) {
+                    const agColor = m.aggression > 70 ? 'var(--danger)' : m.aggression > 40 ? 'var(--warning)' : 'var(--success)';
+                    html += `<tr><td>${m.month}</td><td>${m.trades}</td><td class="${m.total_pnl >= 0 ? 'positive' : 'negative'}">${m.total_pnl >= 0 ? '+' : ''}${m.total_pnl}</td><td>${m.win_rate}%</td><td>${m.risk_reward}</td><td>${m.volatility}</td><td style="color:${agColor}">${m.aggression}</td></tr>`;
+                }
+                html += `</tbody></table>`;
+                // Aggression trend chart
+                const maxAg = 100;
+                html += `<h4 style="margin-top:1.5rem">激进度趋势</h4><div style="display:flex;gap:2px;align-items:flex-end;height:60px;margin:0.5rem 0">`;
+                html += data.months.map(m => {
+                    const h = Math.max(4, m.aggression / maxAg * 55);
+                    const color = m.aggression > 70 ? 'var(--danger)' : m.aggression > 40 ? 'var(--warning)' : 'var(--success)';
+                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" title="${m.month}: ${m.aggression}"><div style="width:80%;height:${h}px;background:${color};border-radius:2px"></div><div style="font-size:0.65rem;margin-top:2px">${m.month.slice(5)}</div></div>`;
+                }).join('');
+                html += `</div>`;
+            } else {
+                html += `<p style="color:var(--text-dim)">${data.message || '暂无数据'}</p>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
