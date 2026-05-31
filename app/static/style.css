@@ -228,6 +228,11 @@ button.secondary:hover { background: #1a4a7a; }
 }
 .review-history-item.expanded .critique-expand { display: block; }
 
+.detail-section { margin-bottom: 0.8rem; }
+.detail-section strong { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; color: var(--text-dim); }
+.detail-section p { white-space: pre-wrap; font-size: 0.9rem; }
+.detail-section ul { padding-left: 1.2rem; font-size: 0.9rem; }
+
 /* Matrix */
 .hint { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1rem; }
 

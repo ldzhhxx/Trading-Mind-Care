@@ -69,6 +69,26 @@ async def list_reviews(trade_date: str | None = None, limit: int = 20, offset: i
         await db.close()
 
 
+@router.get("/{review_id}")
+async def get_review_detail(review_id: int):
+    """Get full review detail with associated plans and weaknesses."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM reviews WHERE id = ?", (review_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="复盘不存在")
+        review = dict(row)
+        # Get plans for that day
+        cursor = await db.execute(
+            "SELECT content, plan_type FROM plans WHERE trade_date = ?", (review["trade_date"],)
+        )
+        review["plans"] = [dict(r) for r in await cursor.fetchall()]
+        return review
+    finally:
+        await db.close()
+
+
 @router.post("")
 async def create_review(review: ReviewCreate):
     trade_date = review.trade_date or date.today().isoformat()

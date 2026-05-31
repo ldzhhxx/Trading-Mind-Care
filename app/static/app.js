@@ -210,21 +210,43 @@ async function loadReviews() {
         el.innerHTML = reviews.map(r => {
             const pnlClass = r.pnl > 0 ? 'pnl-pos' : r.pnl < 0 ? 'pnl-neg' : '';
             const pnlText = r.pnl !== null ? `<span class="${pnlClass}">${r.pnl > 0 ? '+' : ''}${r.pnl}</span>` : '';
-            const critique = r.ai_critique ? esc(r.ai_critique) : '<em style="color:var(--text-dim)">无 AI 点评</em>';
-            return `<div class="review-history-item" onclick="this.classList.toggle('expanded')">
+            return `<div class="review-history-item" onclick="toggleReviewDetail(this, ${r.id})">
                 <div class="meta"><span class="date">${r.trade_date}</span>${pnlText}</div>
                 <div class="summary">${esc(r.emotion_log).slice(0, 80)}${r.emotion_log.length > 80 ? '...' : ''}</div>
-                <div class="critique-expand">${critique}</div>
+                <div class="critique-expand" id="review-detail-${r.id}"></div>
             </div>`;
         }).join('');
 
-        // Pagination
         const pag = document.getElementById('review-pagination');
         let html = '';
         if (reviewPage > 0) html += `<button class="secondary" onclick="reviewPage--;loadReviews()" style="margin:0 0.3rem">← 上一页</button>`;
         if (reviews.length === PAGE_SIZE) html += `<button class="secondary" onclick="reviewPage++;loadReviews()" style="margin:0 0.3rem">下一页 →</button>`;
         pag.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
+}
+
+async function toggleReviewDetail(el, id) {
+    if (el.classList.contains('expanded')) {
+        el.classList.remove('expanded');
+        return;
+    }
+    el.classList.add('expanded');
+    const detail = document.getElementById(`review-detail-${id}`);
+    if (detail.dataset.loaded) return;
+
+    try {
+        const r = await api(`/api/reviews/${id}`);
+        let html = '';
+        if (r.plans && r.plans.length) {
+            html += `<div class="detail-section"><strong>📋 当日计划：</strong><ul>${r.plans.map(p => `<li>${esc(p.content)}</li>`).join('')}</ul></div>`;
+        }
+        html += `<div class="detail-section"><strong>💬 倾诉全文：</strong><p>${esc(r.emotion_log)}</p></div>`;
+        if (r.ai_critique) {
+            html += `<div class="detail-section"><strong>🔥 AI 拷打：</strong><p>${esc(r.ai_critique)}</p></div>`;
+        }
+        detail.innerHTML = html;
+        detail.dataset.loaded = '1';
+    } catch (e) { detail.innerHTML = '<em>加载失败</em>'; }
 }
 
 async function exportReviews() {
