@@ -53,6 +53,16 @@ async def coach_chat(req: ChatMessage):
             "SELECT pnl, mood, trade_date FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date DESC LIMIT 5"
         )
         recent = [dict(r) for r in await cursor.fetchall()]
+        # Get active rules for context
+        cursor = await db.execute("SELECT rule, category FROM trade_rules WHERE active = 1 LIMIT 5")
+        rules = [dict(r) for r in await cursor.fetchall()]
+        # Get goals
+        from datetime import date
+        this_month = date.today().strftime("%Y-%m")
+        cursor = await db.execute(
+            "SELECT title, status FROM goals WHERE target_month = ? LIMIT 3", (this_month,)
+        )
+        goals = [dict(r) for r in await cursor.fetchall()]
     finally:
         await db.close()
 
@@ -62,6 +72,10 @@ async def coach_chat(req: ChatMessage):
     if recent:
         pnl_str = ", ".join(f"{r['trade_date']}:{r['pnl']:+.0f}" for r in recent)
         context_parts.append(f"近期盈亏：{pnl_str}")
+    if rules:
+        context_parts.append("交易纪律：" + "; ".join(f"[{r['category']}]{r['rule']}" for r in rules))
+    if goals:
+        context_parts.append("本月目标：" + ", ".join(f"{g['title']}({g['status']})" for g in goals))
 
     system = COACH_SYSTEM
     if context_parts:
