@@ -1,8 +1,28 @@
 """Vulnerability matrix routes."""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, field_validator
 from app.database import get_db
 
 router = APIRouter(prefix="/api/vulnerabilities", tags=["vulnerabilities"])
+
+
+class VulnCreate(BaseModel):
+    tag: str
+    weight: float = 1.0
+    description: str = ""
+
+    @field_validator("tag")
+    @classmethod
+    def tag_valid(cls, v):
+        if not v.strip():
+            raise ValueError("标签不能为空")
+        return v.strip()
+
+
+class VulnUpdate(BaseModel):
+    tag: str | None = None
+    weight: float | None = None
+    description: str | None = None
 
 
 @router.get("")
@@ -14,6 +34,52 @@ async def list_vulnerabilities():
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+@router.post("")
+async def create_vulnerability(vuln: VulnCreate):
+    db = await get_db()
+    try:
+        from datetime import date
+        now = date.today().isoformat()
+        cursor = await db.execute(
+            "INSERT INTO vulnerability_matrix (tag, weight, hit_count, last_hit_at, description) VALUES (?, ?, 0, ?, ?)",
+            (vuln.tag, vuln.weight, now, vuln.description),
+        )
+        await db.commit()
+        return {"id": cursor.lastrowid}
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            raise HTTPException(status_code=409, detail="该弱点标签已存在")
+        raise
+    finally:
+        await db.close()
+
+
+@router.put("/{vuln_id}")
+async def update_vulnerability(vuln_id: int, vuln: VulnUpdate):
+    db = await get_db()
+    try:
+        sets, params = [], []
+        if vuln.tag is not None:
+            sets.append("tag = ?")
+            params.append(vuln.tag.strip())
+        if vuln.weight is not None:
+            sets.append("weight = ?")
+            params.append(vuln.weight)
+        if vuln.description is not None:
+            sets.append("description = ?")
+            params.append(vuln.description)
+        if not sets:
+            return {"ok": True}
+        params.append(vuln_id)
+        cursor = await db.execute(f"UPDATE vulnerability_matrix SET {', '.join(sets)} WHERE id = ?", params)
+        await db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="弱点不存在")
+        return {"ok": True}
     finally:
         await db.close()
 

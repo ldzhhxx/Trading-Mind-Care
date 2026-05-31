@@ -265,13 +265,12 @@ async function loadMatrix() {
         const chart = document.getElementById('matrix-chart');
 
         if (!vulns.length) {
-            tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="icon">📊</div><div class="msg">暂无数据</div><div class="hint">完成复盘后系统会自动提取弱点</div></div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📊</div><div class="msg">暂无数据</div><div class="hint">完成复盘后系统会自动提取弱点，或手动添加</div></div></td></tr>';
             chart.innerHTML = '';
             return;
         }
 
         const maxW = Math.max(...vulns.map(v => v.weight));
-        // Bar chart
         chart.innerHTML = '<div style="margin-bottom:1.5rem">' + vulns.slice(0, 8).map(v => {
             const pct = Math.max(5, (v.weight / maxW) * 100);
             return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
@@ -286,13 +285,45 @@ async function loadMatrix() {
         tbody.innerHTML = vulns.map(v => {
             const pct = Math.max(5, (v.weight / maxW) * 100);
             return `<tr>
-                <td><strong>${esc(v.tag)}</strong></td>
+                <td><strong>${esc(v.tag)}</strong><br><small style="color:var(--text-dim)">${esc(v.description || '')}</small></td>
                 <td><div class="weight-bar-container"><div class="weight-bar" style="width:${pct}px"></div><span class="weight-value">${v.weight.toFixed(2)}</span></div></td>
                 <td>${v.hit_count}</td>
                 <td>${v.last_hit_at || '-'}</td>
-                <td><button onclick="deleteVuln(${v.id})" class="secondary" style="padding:0.2rem 0.5rem;margin:0;font-size:0.8rem">删除</button></td>
+                <td style="white-space:nowrap">
+                    <button onclick="editVuln(${v.id}, '${esc(v.tag)}', ${v.weight}, '${esc(v.description || '')}')" class="secondary" style="padding:0.2rem 0.5rem;margin:0 0.2rem 0 0;font-size:0.8rem">编辑</button>
+                    <button onclick="deleteVuln(${v.id})" class="secondary" style="padding:0.2rem 0.5rem;margin:0;font-size:0.8rem">删除</button>
+                </td>
             </tr>`;
         }).join('');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function addVuln() {
+    const tag = document.getElementById('vuln-tag-input').value.trim();
+    if (!tag) { toast('请输入弱点标签', 'error'); return; }
+    const weight = parseFloat(document.getElementById('vuln-weight-input').value) || 1.0;
+    const desc = document.getElementById('vuln-desc-input').value.trim();
+    try {
+        await api('/api/vulnerabilities', { method: 'POST', body: JSON.stringify({ tag, weight, description: desc }) });
+        document.getElementById('vuln-tag-input').value = '';
+        document.getElementById('vuln-weight-input').value = '1.0';
+        document.getElementById('vuln-desc-input').value = '';
+        loadMatrix();
+        toast('已添加');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function editVuln(id, tag, weight, desc) {
+    const newTag = prompt('弱点标签：', tag);
+    if (newTag === null) return;
+    const newWeight = prompt('权重：', weight);
+    if (newWeight === null) return;
+    const newDesc = prompt('描述：', desc);
+    if (newDesc === null) return;
+    try {
+        await api(`/api/vulnerabilities/${id}`, { method: 'PUT', body: JSON.stringify({ tag: newTag.trim(), weight: parseFloat(newWeight), description: newDesc.trim() }) });
+        loadMatrix();
+        toast('已更新');
     } catch (e) { toast(e.message, 'error'); }
 }
 

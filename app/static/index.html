@@ -67,6 +67,12 @@
                 <button class="secondary" onclick="exportMatrix()" style="margin:0;padding:0.3rem 0.8rem;font-size:0.8rem">导出 JSON</button>
             </div>
             <p class="hint">权重越高，说明该弱点近期越活跃。系统每日自动衰减未触发的弱点。</p>
+            <div class="add-vuln-form" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
+                <input id="vuln-tag-input" placeholder="弱点标签" style="flex:1;min-width:120px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">
+                <input id="vuln-weight-input" type="number" step="0.1" value="1.0" placeholder="权重" style="width:70px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">
+                <input id="vuln-desc-input" placeholder="描述（可选）" style="flex:1;min-width:120px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">
+                <button onclick="addVuln()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">+ 手动添加</button>
+            </div>
             <div id="matrix-chart"></div>
             <table id="matrix-table">
                 <thead><tr><th>弱点</th><th>权重</th><th>触发次数</th><th>最近触发</th><th>操作</th></tr></thead>
