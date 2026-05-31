@@ -148,6 +148,12 @@
                 <button onclick="loadDailyReport()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">查看</button>
             </div>
             <div id="daily-content"></div>
+            <div style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">
+                <h3 style="margin-bottom:0.5rem">📓 交易日记</h3>
+                <div id="journal-entries"></div>
+                <textarea id="journal-input" rows="3" placeholder="记录今日市场观察、学到的教训、明日思路..." style="width:100%;margin-top:0.8rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);padding:0.6rem;border-radius:var(--radius);font-size:0.9rem;font-family:inherit;resize:vertical"></textarea>
+                <button onclick="saveJournal()" style="margin-top:0.5rem;padding:0.4rem 0.8rem;font-size:0.85rem">保存日记</button>
+            </div>
         </section>
 
         <!-- Calendar Tab -->

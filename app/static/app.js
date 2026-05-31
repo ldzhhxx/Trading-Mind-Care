@@ -644,6 +644,40 @@ async function loadDailyReport() {
 
         el.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
+
+    // Load journal for this date
+    loadJournal();
+}
+
+async function loadJournal() {
+    const d = document.getElementById('daily-date-input').value;
+    try {
+        const entries = await api(`/api/journal?trade_date=${d}`);
+        const el = document.getElementById('journal-entries');
+        if (!entries.length) { el.innerHTML = '<span style="color:var(--text-dim);font-size:0.85rem">当日无日记</span>'; return; }
+        el.innerHTML = entries.map(e => `<div class="plan-item">
+            <span class="content" style="white-space:pre-wrap;font-size:0.85rem">${esc(e.content)}</span>
+            <span class="actions"><button onclick="deleteJournal(${e.id})" title="删除">✕</button></span>
+        </div>`).join('');
+    } catch (e) {}
+}
+
+async function saveJournal() {
+    const input = document.getElementById('journal-input');
+    const content = input.value.trim();
+    if (!content) { toast('请输入日记内容', 'error'); return; }
+    const trade_date = document.getElementById('daily-date-input').value;
+    try {
+        await api('/api/journal', { method: 'POST', body: JSON.stringify({ content, trade_date }) });
+        input.value = '';
+        loadJournal();
+        toast('日记已保存');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteJournal(id) {
+    if (!confirm('确定删除？')) return;
+    try { await api(`/api/journal/${id}`, { method: 'DELETE' }); loadJournal(); } catch (e) { toast(e.message, 'error'); }
 }
 
 // --- Settings ---

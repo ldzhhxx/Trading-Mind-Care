@@ -80,8 +80,16 @@ async def init_db():
             created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
         );
 
+        CREATE TABLE IF NOT EXISTS journal (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            trade_date TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        );
+
         CREATE INDEX IF NOT EXISTS idx_plans_date ON plans(trade_date);
         CREATE INDEX IF NOT EXISTS idx_reviews_date ON reviews(trade_date);
+        CREATE INDEX IF NOT EXISTS idx_journal_date ON journal(trade_date);
         """)
 
         # Migrations for existing databases
