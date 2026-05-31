@@ -147,6 +147,18 @@ async def _run_migrations(db):
         (2, "ALTER TABLE vulnerability_matrix ADD COLUMN category TEXT NOT NULL DEFAULT '未分类'"),
         # Migration 3: Add done column to plans
         (3, "ALTER TABLE plans ADD COLUMN done INTEGER NOT NULL DEFAULT 0"),
+        # Migration 4: Goals table
+        (4, """CREATE TABLE IF NOT EXISTS goals (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            title        TEXT NOT NULL,
+            goal_type    TEXT NOT NULL DEFAULT 'monthly',
+            target_month TEXT NOT NULL,
+            status       TEXT NOT NULL DEFAULT 'active',
+            created_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            completed_at TEXT
+        )"""),
+        # Migration 5: Index on goals
+        (5, "CREATE INDEX IF NOT EXISTS idx_goals_month ON goals(target_month)"),
     ]
 
     for version, sql in migrations:

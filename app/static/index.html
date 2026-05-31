@@ -21,6 +21,7 @@
             <button class="tab" data-tab="matrix">📊 弱点矩阵</button>
             <button class="tab" data-tab="stats">📈 统计</button>
             <button class="tab" data-tab="analytics">🔬 深度分析</button>
+            <button class="tab" data-tab="habits">🎯 习惯</button>
             <button class="tab" data-tab="daily">📅 日报</button>
             <button class="tab" data-tab="calendar">🗓️ 日历</button>
             <button class="tab" data-tab="settings">⚙️ 设置</button>
@@ -224,6 +225,24 @@
                     <button onclick="aiAnalytics('weakness-deep')" class="secondary" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">🧬 弱点关联</button>
                 </div>
                 <div id="ai-analytics-result" class="critique-box" style="display:none"></div>
+            </div>
+        </section>
+
+        <!-- Habits Tab -->
+        <section id="tab-habits" class="tab-content">
+            <h2 style="margin-bottom:1rem">🎯 习惯追踪 & 目标设定</h2>
+            <div id="streaks-panel" class="stats-grid" style="margin-bottom:2rem"></div>
+            <div style="border-top:1px solid var(--surface2);padding-top:1.5rem">
+                <h3 style="margin-bottom:0.8rem">📌 月度目标</h3>
+                <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
+                    <input id="goal-input" placeholder="如：本月不报复性下单" style="flex:1;min-width:200px;padding:0.4rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.85rem">
+                    <button onclick="addGoal()" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">+ 添加目标</button>
+                </div>
+                <div id="goals-list"></div>
+            </div>
+            <div style="border-top:1px solid var(--surface2);padding-top:1.5rem;margin-top:1.5rem">
+                <h3 style="margin-bottom:0.8rem">🏆 里程碑</h3>
+                <div id="milestones-panel"></div>
             </div>
         </section>
 

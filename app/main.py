@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.database import init_db, get_db
 from app.scheduler import start_scheduler, daily_decay
 from app.feishu import send_daily_notification
-from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal, monthly, analytics
+from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal, monthly, analytics, goals
 
 # Configure logging
 logging.basicConfig(
@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down")
 
 
-app = FastAPI(title="Trading Mind Care", version="5.0.0", lifespan=lifespan)
+app = FastAPI(title="Trading Mind Care", version="6.0.0", lifespan=lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -99,6 +99,7 @@ app.include_router(insights.router)
 app.include_router(journal.router)
 app.include_router(monthly.router)
 app.include_router(analytics.router)
+app.include_router(goals.router)
 
 # Static files
 static_dir = get_static_dir()
@@ -121,4 +122,4 @@ async def version():
         clean = row["value"] == "1" if row else True
     finally:
         await db.close()
-    return {"version": "5.0.0", "name": "Trading Mind Care", "features": 75, "last_shutdown_clean": clean}
+    return {"version": "6.0.0", "name": "Trading Mind Care", "features": 85, "last_shutdown_clean": clean}

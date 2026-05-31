@@ -26,6 +26,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
         else if (tab === 'analytics') loadAnalytics('pnl');
+        else if (tab === 'habits') loadHabits();
         else if (tab === 'daily') loadDailyReport();
         else if (tab === 'calendar') loadCalendar();
         else if (tab === 'settings') loadSettings();
@@ -1382,4 +1383,84 @@ async function aiGenerateRules() {
             toast(`已添加 ${res.rules.length} 条 AI 生成规则`);
         }
     } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Habits & Goals ---
+async function loadHabits() {
+    try {
+        const [streaks, goals] = await Promise.all([
+            api('/api/goals/streaks'),
+            api('/api/goals?month=' + new Date().toISOString().slice(0,7)),
+        ]);
+        renderStreaks(streaks);
+        renderGoals(goals);
+        renderMilestones(streaks);
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+function renderStreaks(s) {
+    const panel = document.getElementById('streaks-panel');
+    panel.innerHTML = `
+        <div class="stat-card"><div class="stat-value">${s.review_streak}</div><div class="stat-label">🔥 连续复盘天数</div></div>
+        <div class="stat-card"><div class="stat-value">${s.plan_streak}</div><div class="stat-label">📋 连续计划天数</div></div>
+        <div class="stat-card"><div class="stat-value">${s.best_streak}</div><div class="stat-label">🏆 最长连续记录</div></div>
+        <div class="stat-card"><div class="stat-value">${s.total_review_days}</div><div class="stat-label">📊 总复盘天数</div></div>
+        <div class="stat-card"><div class="stat-value">${s.month_goals_done}/${s.month_goals_total}</div><div class="stat-label">🎯 本月目标完成</div></div>
+    `;
+}
+
+function renderGoals(goals) {
+    const list = document.getElementById('goals-list');
+    if (!goals.length) { list.innerHTML = '<p style="color:var(--text-dim);font-size:0.85rem">暂无目标，添加一个吧！</p>'; return; }
+    list.innerHTML = goals.map(g => {
+        const statusIcon = g.status === 'completed' ? '✅' : g.status === 'failed' ? '❌' : '⏳';
+        const actions = g.status === 'active' ? `<button onclick="completeGoal(${g.id})" class="secondary" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">完成</button><button onclick="failGoal(${g.id})" class="secondary" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">失败</button>` : '';
+        return `<div class="goal-item" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--surface);border-radius:var(--radius);margin-bottom:0.4rem">
+            <span>${statusIcon}</span><span style="flex:1">${g.title}</span>${actions}
+            <button onclick="deleteGoal(${g.id})" class="secondary" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem;color:var(--danger)">×</button>
+        </div>`;
+    }).join('');
+}
+
+function renderMilestones(s) {
+    const panel = document.getElementById('milestones-panel');
+    const milestones = [
+        { threshold: 7, label: '连续复盘 7 天', icon: '🌟', achieved: s.best_streak >= 7 },
+        { threshold: 14, label: '连续复盘 14 天', icon: '⭐', achieved: s.best_streak >= 14 },
+        { threshold: 30, label: '连续复盘 30 天', icon: '🏅', achieved: s.best_streak >= 30 },
+        { threshold: 60, label: '连续复盘 60 天', icon: '🥇', achieved: s.best_streak >= 60 },
+        { threshold: 100, label: '总复盘 100 天', icon: '💯', achieved: s.total_review_days >= 100 },
+    ];
+    panel.innerHTML = milestones.map(m =>
+        `<div style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.4rem 0.8rem;margin:0.2rem;border-radius:20px;font-size:0.85rem;${m.achieved ? 'background:var(--accent);color:#fff' : 'background:var(--surface);color:var(--text-dim);opacity:0.6'}">${m.icon} ${m.label}</div>`
+    ).join('');
+}
+
+async function addGoal() {
+    const input = document.getElementById('goal-input');
+    const title = input.value.trim();
+    if (!title) return;
+    try {
+        await api('/api/goals', { method: 'POST', body: JSON.stringify({ title, goal_type: 'monthly', target_month: new Date().toISOString().slice(0,7) }) });
+        input.value = '';
+        loadHabits();
+        toast('目标已添加');
+    } catch(e) { toast(e.message, 'error'); }
+}
+
+async function completeGoal(id) {
+    await api(`/api/goals/${id}/complete`, { method: 'POST' });
+    loadHabits();
+    toast('🎉 恭喜完成目标！');
+}
+
+async function failGoal(id) {
+    await api(`/api/goals/${id}/fail`, { method: 'POST' });
+    loadHabits();
+}
+
+async function deleteGoal(id) {
+    if (!confirm('确定删除？')) return;
+    await api(`/api/goals/${id}`, { method: 'DELETE' });
+    loadHabits();
 }
