@@ -111,6 +111,18 @@ async function loadPlans() {
         } else {
             statusEl.textContent = '📊 今日尚未复盘';
         }
+
+        // Load streak badge
+        try {
+            const stats = await api('/api/stats');
+            const badge = document.getElementById('streak-badge');
+            if (stats.streak_days >= 3) {
+                badge.innerHTML = `🔥 ${stats.streak_days}天连续复盘`;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch(e) {}
     } catch (e) { toast(e.message, 'error'); }
 }
 
