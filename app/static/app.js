@@ -1125,7 +1125,9 @@ async function generateMonthlySummary() {
 // Prevent accidental page leave with unsaved review
 window.addEventListener('beforeunload', e => {
     const emotion = document.getElementById('emotion-input').value.trim();
-    if (emotion) { e.preventDefault(); e.returnValue = ''; }
+    const todayInput = document.getElementById('today-input').value.trim();
+    const tomorrowInput = document.getElementById('tomorrow-input').value.trim();
+    if (emotion || todayInput || tomorrowInput) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // Auto-save review draft to localStorage
