@@ -159,6 +159,13 @@ async def _run_migrations(db):
         )"""),
         # Migration 5: Index on goals
         (5, "CREATE INDEX IF NOT EXISTS idx_goals_month ON goals(target_month)"),
+        # Migration 6: Performance indexes
+        (6, "CREATE INDEX IF NOT EXISTS idx_reviews_pnl ON reviews(pnl)"),
+        (7, "CREATE INDEX IF NOT EXISTS idx_reviews_mood ON reviews(mood)"),
+        (8, "CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at)"),
+        (9, "CREATE INDEX IF NOT EXISTS idx_plans_type_date ON plans(plan_type, trade_date)"),
+        (10, "CREATE INDEX IF NOT EXISTS idx_vuln_weight ON vulnerability_matrix(weight DESC)"),
+        (11, "CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status)"),
     ]
 
     for version, sql in migrations:
