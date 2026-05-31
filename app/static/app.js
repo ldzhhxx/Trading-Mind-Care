@@ -257,6 +257,7 @@ async function submitReview() {
 
         document.getElementById('emotion-input').value = '';
         document.getElementById('pnl-input').value = '';
+        localStorage.removeItem('review_draft');
         loadReviews();
     } catch (e) {
         box.textContent = 'AI 暂不可用，复盘已保存。请在设置中配置 LLM。';
@@ -757,6 +758,15 @@ window.addEventListener('beforeunload', e => {
     const emotion = document.getElementById('emotion-input').value.trim();
     if (emotion) { e.preventDefault(); e.returnValue = ''; }
 });
+
+// Auto-save review draft to localStorage
+const emotionInput = document.getElementById('emotion-input');
+const savedDraft = localStorage.getItem('review_draft');
+if (savedDraft) emotionInput.value = savedDraft;
+emotionInput.addEventListener('input', () => localStorage.setItem('review_draft', emotionInput.value));
+// Clear draft on successful submit
+const origSubmit = submitReview;
+// (draft cleared inside submitReview after success via emotion-input.value = '')
 
 // Initial load
 loadPlans();
