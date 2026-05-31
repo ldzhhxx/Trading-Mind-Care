@@ -25,9 +25,25 @@ async def get_calendar(year: int | None = None, month: int | None = None):
             "FROM reviews WHERE trade_date >= ? AND trade_date < ? GROUP BY trade_date",
             (start, end),
         )
-        days = {row["trade_date"]: {"pnl": row["daily_pnl"], "count": row["cnt"]} for row in await cursor.fetchall()}
-        total_pnl = sum(d["pnl"] or 0 for d in days.values())
-        trade_days = len(days)
+        days = {}
+        for row in await cursor.fetchall():
+            days[row["trade_date"]] = {"pnl": row["daily_pnl"], "count": row["cnt"]}
+
+        # Plan execution per day
+        cursor = await db.execute(
+            "SELECT trade_date, COUNT(*) as total, SUM(done) as done "
+            "FROM plans WHERE trade_date >= ? AND trade_date < ? AND plan_type='today' GROUP BY trade_date",
+            (start, end),
+        )
+        for row in await cursor.fetchall():
+            d = row["trade_date"]
+            if d not in days:
+                days[d] = {"pnl": None, "count": 0}
+            days[d]["plan_total"] = row["total"]
+            days[d]["plan_done"] = row["done"] or 0
+
+        total_pnl = sum(d.get("pnl") or 0 for d in days.values())
+        trade_days = sum(1 for d in days.values() if d.get("count", 0) > 0)
         return {"year": y, "month": m, "days": days, "month_pnl": total_pnl, "trade_days": trade_days}
     finally:
         await db.close()

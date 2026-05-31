@@ -1048,9 +1048,15 @@ async function loadCalendar() {
             if (info) {
                 if (info.pnl > 0) { cls += ' profit'; badge = `<span class="cal-pnl positive">+${info.pnl.toFixed(0)}</span>`; }
                 else if (info.pnl < 0) { cls += ' loss'; badge = `<span class="cal-pnl negative">${info.pnl.toFixed(0)}</span>`; }
-                else { cls += ' neutral'; badge = `<span class="cal-pnl">0</span>`; }
+                else if (info.count > 0) { cls += ' neutral'; badge = `<span class="cal-pnl">0</span>`; }
+                // Plan execution indicator
+                if (info.plan_total > 0) {
+                    const rate = (info.plan_done || 0) / info.plan_total;
+                    const icon = rate >= 1 ? '✅' : rate > 0 ? '🟡' : '❌';
+                    badge += `<span style="font-size:0.6rem">${icon}</span>`;
+                }
             }
-            html += `<div class="${cls}" onclick="calendarDayClick('${key}')" style="cursor:${info?'pointer':'default'}"><span class="cal-day">${d}</span>${badge}</div>`;
+            html += `<div class="${cls}" onclick="calendarDayClick('${key}')" style="cursor:pointer"><span class="cal-day">${d}</span>${badge}</div>`;
         }
         grid.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
