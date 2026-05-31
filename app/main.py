@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from app.database import init_db
 from app.scheduler import start_scheduler, daily_decay
 from app.feishu import send_daily_notification
-from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report
+from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data
 
 
 def get_static_dir() -> str:
@@ -42,6 +42,7 @@ app.include_router(settings.router)
 app.include_router(notifications.router)
 app.include_router(stats.router)
 app.include_router(daily_report.router)
+app.include_router(data.router)
 
 # Static files
 static_dir = get_static_dir()

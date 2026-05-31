@@ -557,6 +557,30 @@ function showResult(id, msg, success) {
     el.style.background = success ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)';
 }
 
+async function saveIntensity() {
+    const val = document.getElementById('cfg-intensity').value;
+    try {
+        await api('/api/settings/llm-extra', { method: 'POST', body: JSON.stringify({ critique_intensity: val }) });
+        toast('已保存');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function exportData(type, format) {
+    window.open(`/api/data/export/${type}?format=${format}`);
+}
+
+async function importReviews() {
+    const file = document.getElementById('import-file').files[0];
+    if (!file) { toast('请选择文件', 'error'); return; }
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const res = await fetch('/api/data/import/reviews', { method: 'POST', body: formData });
+        const result = await res.json();
+        document.getElementById('import-result').textContent = result.error || `成功导入 ${result.imported} 条记录`;
+    } catch (e) { toast(e.message, 'error'); }
+}
+
 // --- Utils ---
 function esc(s) {
     const d = document.createElement('div');

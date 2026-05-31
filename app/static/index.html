@@ -135,6 +135,27 @@
                 </div>
                 <div id="feishu-test-result"></div>
             </div>
+            <div class="settings-section">
+                <h2>拷打强度</h2>
+                <label>强度等级（1=温和教练，5=极端毒舌）</label>
+                <input type="range" id="cfg-intensity" min="1" max="5" value="3" style="width:100%">
+                <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-dim)"><span>温和</span><span>中等</span><span>毒舌</span></div>
+                <button onclick="saveIntensity()" style="margin-top:0.5rem">保存</button>
+            </div>
+            <div class="settings-section">
+                <h2>数据管理</h2>
+                <div class="btn-row" style="flex-wrap:wrap">
+                    <button class="secondary" onclick="exportData('reviews','json')">导出复盘 JSON</button>
+                    <button class="secondary" onclick="exportData('reviews','csv')">导出复盘 CSV</button>
+                    <button class="secondary" onclick="exportData('vulnerabilities','json')">导出弱点 JSON</button>
+                    <button class="secondary" onclick="exportData('vulnerabilities','csv')">导出弱点 CSV</button>
+                    <button class="secondary" onclick="window.open('/api/data/backup')">下载数据库备份</button>
+                </div>
+                <label style="margin-top:1rem">导入复盘数据（JSON）</label>
+                <input type="file" id="import-file" accept=".json" style="margin-top:0.3rem">
+                <button onclick="importReviews()" style="margin-top:0.5rem">导入</button>
+                <div id="import-result" style="margin-top:0.5rem;font-size:0.85rem"></div>
+            </div>
         </section>
     </main>
 
