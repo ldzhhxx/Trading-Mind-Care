@@ -1,5 +1,18 @@
 /* Trading Mind Care - Frontend Logic */
 
+// Theme
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'light' ? '' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.getElementById('theme-btn').textContent = next === 'light' ? '☀️' : '🌙';
+}
+(function() {
+    const saved = localStorage.getItem('theme');
+    if (saved) { document.documentElement.setAttribute('data-theme', saved); document.getElementById('theme-btn').textContent = saved === 'light' ? '☀️' : '🌙'; }
+})();
+
 // Tab switching
 document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
