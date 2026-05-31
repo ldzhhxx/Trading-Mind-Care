@@ -111,6 +111,15 @@
                     <button type="button" class="mood-btn" data-mood="5" onclick="selectMood(5)" title="非常好">😄</button>
                 </div>
                 <label>交易倾诉</label>
+                <div style="margin-bottom:0.5rem">
+                    <select id="review-template-select" onchange="applyReviewTemplate()" style="padding:0.3rem 0.6rem;background:var(--surface);border:1px solid var(--surface2);color:var(--text);border-radius:var(--radius);font-size:0.8rem;width:100%">
+                        <option value="">📝 选择复盘模板（可选）...</option>
+                        <option value="standard">标准复盘：计划执行 + 情绪 + 教训</option>
+                        <option value="deep">深度复盘：决策过程 + 心理状态 + 改进</option>
+                        <option value="loss">亏损复盘：原因分析 + 规则检查 + 止损</option>
+                        <option value="win">盈利复盘：正确决策 + 风险回顾 + 膨胀检查</option>
+                    </select>
+                </div>
                 <div class="review-prompts" style="margin-bottom:0.5rem;display:flex;gap:0.3rem;flex-wrap:wrap">
                     <button type="button" class="secondary" onclick="insertPrompt('今天我违背了计划，因为')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">违背计划</button>
                     <button type="button" class="secondary" onclick="insertPrompt('今天情绪失控的时刻是')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">情绪失控</button>
