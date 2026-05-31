@@ -97,6 +97,17 @@ async def get_stats():
         plan_done = pr["completed"] or 0
         plan_rate = (plan_done / plan_total * 100) if plan_total > 0 else 0
 
+        # Average review length (engagement metric)
+        cursor = await db.execute("SELECT AVG(LENGTH(emotion_log)) as avg_len FROM reviews")
+        avg_review_len = (await cursor.fetchone())["avg_len"] or 0
+
+        # Review time distribution (hour of day)
+        cursor = await db.execute(
+            "SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour, COUNT(*) as cnt "
+            "FROM reviews GROUP BY hour ORDER BY cnt DESC LIMIT 3"
+        )
+        peak_hours = [dict(r) for r in await cursor.fetchall()]
+
         # Mood trend (last 14 days)
         cursor = await db.execute(
             "SELECT trade_date, AVG(mood) as avg_mood FROM reviews WHERE trade_date >= ? AND mood IS NOT NULL GROUP BY trade_date ORDER BY trade_date",
@@ -170,6 +181,8 @@ async def get_stats():
             "last_month_pnl": float(last_month_pnl),
             "last_month_trades": last_month_trades,
             "weekday_perf": weekday_perf,
+            "avg_review_len": round(avg_review_len),
+            "peak_hours": peak_hours,
         }
     finally:
         await db.close()
