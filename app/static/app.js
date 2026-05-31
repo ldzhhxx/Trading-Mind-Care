@@ -313,6 +313,17 @@ function selectMood(val) {
     });
 }
 
+function insertPrompt(text) {
+    const input = document.getElementById('emotion-input');
+    const pos = input.selectionStart;
+    const before = input.value.substring(0, pos);
+    const after = input.value.substring(pos);
+    input.value = before + (before && !before.endsWith('\n') ? '\n' : '') + text;
+    input.focus();
+    input.selectionStart = input.selectionEnd = input.value.length;
+    input.dispatchEvent(new Event('input'));
+}
+
 async function submitReview() {
     const btn = document.getElementById('submit-review');
     const emotion = document.getElementById('emotion-input').value.trim();

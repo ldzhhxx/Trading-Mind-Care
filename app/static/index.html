@@ -103,6 +103,13 @@
                     <button type="button" class="mood-btn" data-mood="5" onclick="selectMood(5)" title="非常好">😄</button>
                 </div>
                 <label>交易倾诉</label>
+                <div class="review-prompts" style="margin-bottom:0.5rem;display:flex;gap:0.3rem;flex-wrap:wrap">
+                    <button type="button" class="secondary" onclick="insertPrompt('今天我违背了计划，因为')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">违背计划</button>
+                    <button type="button" class="secondary" onclick="insertPrompt('今天情绪失控的时刻是')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">情绪失控</button>
+                    <button type="button" class="secondary" onclick="insertPrompt('今天做得好的地方是')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">做得好</button>
+                    <button type="button" class="secondary" onclick="insertPrompt('今天最大的教训是')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">教训</button>
+                    <button type="button" class="secondary" onclick="insertPrompt('我注意到一个重复的模式：')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.7rem">重复模式</button>
+                </div>
                 <textarea id="emotion-input" rows="5" placeholder="今天交易中发生了什么？你的感受是什么？有没有违背计划的地方？"></textarea>
                 <div id="char-count" style="text-align:right;font-size:0.75rem;color:var(--text-dim);margin-top:0.2rem">0 / 5000</div>
                 <button id="submit-review" onclick="submitReview()">提交复盘 — 接受拷打</button>
