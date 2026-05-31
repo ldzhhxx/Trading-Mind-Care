@@ -172,3 +172,29 @@ async def delete_template(tpl_id: int):
         return {"ok": True}
     finally:
         await db.close()
+
+
+@router.post("/copy-yesterday")
+async def copy_yesterday_plans():
+    """Copy yesterday's today-plans to today."""
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    today_str = date.today().isoformat()
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT content FROM plans WHERE trade_date = ? AND plan_type = 'today'", (yesterday,)
+        )
+        rows = await cursor.fetchall()
+        if not rows:
+            raise HTTPException(status_code=404, detail="昨日无计划可复制")
+        copied = 0
+        for row in rows:
+            await db.execute(
+                "INSERT INTO plans (plan_type, content, trade_date) VALUES ('today', ?, ?)",
+                (row["content"], today_str),
+            )
+            copied += 1
+        await db.commit()
+        return {"copied": copied}
+    finally:
+        await db.close()

@@ -105,6 +105,14 @@ async function addPlan(type) {
     } catch (e) { toast(e.message, 'error'); }
 }
 
+async function copyYesterday() {
+    try {
+        const res = await api('/api/plans/copy-yesterday', { method: 'POST' });
+        toast(`已复制 ${res.copied} 条昨日计划`);
+        loadPlans();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
 async function saveAsTemplate(type) {
     const input = document.getElementById(type + '-input');
     const content = input.value.trim();
