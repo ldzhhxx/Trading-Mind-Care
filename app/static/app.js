@@ -1294,6 +1294,27 @@ async function loadAnalytics(type) {
         if (type === 'pnl') {
             data = await api('/api/analytics/pnl-distribution');
             const maxAbs = Math.max(...data.distribution.map(d => Math.abs(d.pnl)), 1);
+            // Build histogram buckets
+            const pnls = data.distribution.map(d => d.pnl);
+            let histHtml = '';
+            if (pnls.length >= 5) {
+                const minP = Math.min(...pnls), maxP = Math.max(...pnls);
+                const bucketCount = 10;
+                const step = (maxP - minP) / bucketCount || 1;
+                const buckets = Array(bucketCount).fill(0);
+                pnls.forEach(p => { const idx = Math.min(Math.floor((p - minP) / step), bucketCount - 1); buckets[idx]++; });
+                const maxBucket = Math.max(...buckets, 1);
+                histHtml = `<h4 style="margin-top:1rem">盈亏分布直方图</h4>
+                <div style="display:flex;align-items:flex-end;gap:2px;height:80px;border-bottom:1px solid var(--surface2);margin-bottom:0.3rem">
+                    ${buckets.map((cnt, i) => {
+                        const h = Math.max(2, cnt / maxBucket * 70);
+                        const midVal = minP + step * (i + 0.5);
+                        const color = midVal >= 0 ? 'var(--success)' : 'var(--danger)';
+                        return `<div style="flex:1;height:${h}px;background:${color};border-radius:2px 2px 0 0;opacity:0.8" title="${(minP+step*i).toFixed(0)}~${(minP+step*(i+1)).toFixed(0)}: ${cnt}次"></div>`;
+                    }).join('')}
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-dim)"><span>${minP.toFixed(0)}</span><span>0</span><span>+${maxP.toFixed(0)}</span></div>`;
+            }
             html = `<h3>盈亏分布对比</h3>
             <div class="stats-grid" style="margin-bottom:1.5rem">
                 <div class="stat-card"><div class="value positive">${data.win_days_count}</div><div class="label">盈利天数</div></div>
@@ -1305,7 +1326,8 @@ async function loadAnalytics(type) {
                 <div class="stat-card"><div class="value">${data.win_plan_rate.toFixed(0)}%</div><div class="label">盈利日执行率</div></div>
                 <div class="stat-card"><div class="value">${data.loss_plan_rate.toFixed(0)}%</div><div class="label">亏损日执行率</div></div>
             </div>
-            <h4>盈亏分布图</h4>
+            ${histHtml}
+            <h4 style="margin-top:1rem">近30日盈亏条形图</h4>
             <div class="pnl-trend" style="height:80px">${data.distribution.slice(-30).map(d => {
                 const h = Math.max(4, Math.abs(d.pnl) / maxAbs * 60);
                 const color = d.pnl >= 0 ? 'var(--success)' : 'var(--danger)';
