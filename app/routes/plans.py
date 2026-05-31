@@ -108,15 +108,32 @@ async def delete_plan(plan_id: int):
 
 
 @router.get("/warnings")
-async def get_warnings():
-    """Get high-weight vulnerabilities as warnings for plan page."""
+async def get_warnings(content: str | None = None):
+    """Get high-weight vulnerabilities as warnings. If content provided, also match keywords."""
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT tag, weight, description FROM vulnerability_matrix WHERE weight >= 2.0 ORDER BY weight DESC LIMIT 5"
+            "SELECT id, tag, weight, description FROM vulnerability_matrix WHERE weight >= 2.0 ORDER BY weight DESC LIMIT 5"
         )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+        rows = [dict(row) for row in await cursor.fetchall()]
+
+        # If content provided, also check keyword matches from ALL vulnerabilities
+        if content:
+            cursor = await db.execute(
+                "SELECT id, tag, weight, description FROM vulnerability_matrix ORDER BY weight DESC"
+            )
+            all_vulns = [dict(r) for r in await cursor.fetchall()]
+            existing_ids = {r["id"] for r in rows}
+            for v in all_vulns:
+                if v["id"] in existing_ids:
+                    continue
+                # Simple keyword match: if any word in the tag appears in content
+                tag_words = [w for w in v["tag"] if len(w) >= 2]
+                if v["tag"] in content or any(w in content for w in v["tag"].split()):
+                    v["matched"] = True
+                    rows.append(v)
+
+        return rows
     finally:
         await db.close()
 

@@ -86,6 +86,17 @@ async function addPlan(type) {
     const input = document.getElementById(type + '-input');
     const content = input.value.trim();
     if (!content) return;
+
+    // Check keyword warnings before adding
+    try {
+        const warnings = await api(`/api/plans/warnings?content=${encodeURIComponent(content)}`);
+        const matched = warnings.filter(w => w.matched);
+        if (matched.length) {
+            const msg = matched.map(w => `⚠️ "${w.tag}" (权重${w.weight.toFixed(1)})`).join('\n');
+            if (!confirm(`你的计划可能触发以下弱点：\n${msg}\n\n确定继续添加？`)) return;
+        }
+    } catch (e) {}
+
     try {
         await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content }) });
         input.value = '';
