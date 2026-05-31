@@ -94,6 +94,17 @@ async def update_plan(plan_id: int, plan: PlanUpdate):
         await db.close()
 
 
+@router.patch("/{plan_id}/toggle")
+async def toggle_plan_done(plan_id: int):
+    db = await get_db()
+    try:
+        await db.execute("UPDATE plans SET done = 1 - done WHERE id = ?", (plan_id,))
+        await db.commit()
+        return {"ok": True}
+    finally:
+        await db.close()
+
+
 @router.delete("/{plan_id}")
 async def delete_plan(plan_id: int):
     db = await get_db()

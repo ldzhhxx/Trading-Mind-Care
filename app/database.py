@@ -44,6 +44,7 @@ async def init_db():
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             plan_type  TEXT NOT NULL CHECK(plan_type IN ('today', 'tomorrow')),
             content    TEXT NOT NULL,
+            done       INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
             trade_date TEXT NOT NULL
         );
@@ -74,6 +75,12 @@ async def init_db():
         CREATE INDEX IF NOT EXISTS idx_plans_date ON plans(trade_date);
         CREATE INDEX IF NOT EXISTS idx_reviews_date ON reviews(trade_date);
         """)
+
+        # Migrations for existing databases
+        try:
+            await db.execute("ALTER TABLE plans ADD COLUMN done INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass  # column already exists
 
         # Insert defaults if not exist
         defaults = [

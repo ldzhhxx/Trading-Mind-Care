@@ -78,8 +78,9 @@ function renderPlans(containerId, plans) {
         return;
     }
     el.innerHTML = plans.map(p => `
-        <div class="plan-item" id="plan-${p.id}">
-            <span class="content">${esc(p.content)}</span>
+        <div class="plan-item ${p.done ? 'done' : ''}" id="plan-${p.id}">
+            <input type="checkbox" ${p.done ? 'checked' : ''} onchange="togglePlanDone(${p.id})" style="cursor:pointer">
+            <span class="content" style="${p.done ? 'text-decoration:line-through;opacity:0.6' : ''}">${esc(p.content)}</span>
             <span class="actions">
                 <button onclick="editPlan(${p.id})" title="编辑">✎</button>
                 <button onclick="deletePlan(${p.id})" title="删除">✕</button>
@@ -116,6 +117,10 @@ async function addPlan(type) {
         input.value = '';
         loadPlans();
     } catch (e) { toast(e.message, 'error'); }
+}
+
+async function togglePlanDone(id) {
+    try { await api(`/api/plans/${id}/toggle`, { method: 'PATCH' }); loadPlans(); } catch (e) { toast(e.message, 'error'); }
 }
 
 async function copyYesterday() {
