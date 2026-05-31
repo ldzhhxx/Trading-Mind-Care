@@ -1364,14 +1364,7 @@ async function checkPlanClarity(content) {
     } catch(e) {}
 }
 
-// Tab handler for analytics
-const origTabHandler = document.querySelectorAll('.tab');
-origTabHandler.forEach(btn => {
-    const origClick = btn.onclick;
-    btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'analytics') loadAnalytics('pnl');
-    });
-});
+// Tab handler for analytics - handled in main tab click handler above
 
 // --- AI Generate Rules ---
 async function aiGenerateRules() {
