@@ -174,6 +174,14 @@ async function copyYesterday() {
     } catch (e) { toast(e.message, 'error'); }
 }
 
+async function batchComplete() {
+    try {
+        const res = await api('/api/plans/batch-complete', { method: 'POST' });
+        toast(`已完成 ${res.completed} 条计划`);
+        loadPlans();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
 async function saveAsTemplate(type) {
     const input = document.getElementById(type + '-input');
     const content = input.value.trim();

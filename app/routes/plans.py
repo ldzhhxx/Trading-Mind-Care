@@ -209,3 +209,35 @@ async def copy_yesterday_plans():
         return {"copied": copied}
     finally:
         await db.close()
+
+
+@router.post("/batch-complete")
+async def batch_complete_plans(trade_date: str | None = None):
+    """Mark all today's plans as done."""
+    trade_date = trade_date or date.today().isoformat()
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE plans SET done = 1 WHERE trade_date = ? AND plan_type = 'today' AND done = 0",
+            (trade_date,),
+        )
+        await db.commit()
+        return {"completed": cursor.rowcount}
+    finally:
+        await db.close()
+
+
+@router.post("/batch-reset")
+async def batch_reset_plans(trade_date: str | None = None):
+    """Reset all today's plans to undone."""
+    trade_date = trade_date or date.today().isoformat()
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE plans SET done = 0 WHERE trade_date = ? AND plan_type = 'today' AND done = 1",
+            (trade_date,),
+        )
+        await db.commit()
+        return {"reset": cursor.rowcount}
+    finally:
+        await db.close()
