@@ -21,13 +21,13 @@ async def get_calendar(year: int | None = None, month: int | None = None):
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT trade_date, SUM(pnl) as daily_pnl, COUNT(*) as cnt "
+            "SELECT trade_date, SUM(pnl) as daily_pnl, COUNT(*) as cnt, AVG(mood) as avg_mood "
             "FROM reviews WHERE trade_date >= ? AND trade_date < ? GROUP BY trade_date",
             (start, end),
         )
         days = {}
         for row in await cursor.fetchall():
-            days[row["trade_date"]] = {"pnl": row["daily_pnl"], "count": row["cnt"]}
+            days[row["trade_date"]] = {"pnl": row["daily_pnl"], "count": row["cnt"], "mood": row["avg_mood"]}
 
         # Plan execution per day
         cursor = await db.execute(

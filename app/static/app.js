@@ -1111,6 +1111,7 @@ async function loadCalendar() {
             const info = data.days[key];
             let cls = 'cal-cell';
             let badge = '';
+            let moodStyle = '';
             if (info) {
                 if (info.pnl > 0) { cls += ' profit'; badge = `<span class="cal-pnl positive">+${info.pnl.toFixed(0)}</span>`; }
                 else if (info.pnl < 0) { cls += ' loss'; badge = `<span class="cal-pnl negative">${info.pnl.toFixed(0)}</span>`; }
@@ -1121,8 +1122,13 @@ async function loadCalendar() {
                     const icon = rate >= 1 ? '✅' : rate > 0 ? '🟡' : '❌';
                     badge += `<span style="font-size:0.6rem">${icon}</span>`;
                 }
+                // Mood heatmap overlay
+                if (info.mood) {
+                    const moodColors = ['','rgba(220,50,50,0.15)','rgba(220,130,50,0.15)','rgba(180,180,80,0.1)','rgba(80,180,80,0.15)','rgba(50,180,50,0.2)'];
+                    moodStyle = `border-left:3px solid ${['','#dc3232','#dc8232','#b4b450','#50b450','#32b432'][Math.round(info.mood)] || 'transparent'}`;
+                }
             }
-            html += `<div class="${cls}" onclick="calendarDayClick('${key}')" style="cursor:pointer"><span class="cal-day">${d}</span>${badge}</div>`;
+            html += `<div class="${cls}" onclick="calendarDayClick('${key}')" style="cursor:pointer;${moodStyle}"><span class="cal-day">${d}</span>${badge}</div>`;
         }
         grid.innerHTML = html;
     } catch (e) { toast(e.message, 'error'); }
