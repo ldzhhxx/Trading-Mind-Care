@@ -64,7 +64,8 @@ async def init_db():
             weight      REAL NOT NULL DEFAULT 1.0,
             hit_count   INTEGER NOT NULL DEFAULT 0,
             last_hit_at TEXT,
-            description TEXT
+            description TEXT,
+            category    TEXT NOT NULL DEFAULT '未分类'
         );
 
         CREATE TABLE IF NOT EXISTS plan_templates (
@@ -100,6 +101,11 @@ async def init_db():
 
         try:
             await db.execute("ALTER TABLE reviews ADD COLUMN mood INTEGER")
+        except Exception:
+            pass  # column already exists
+
+        try:
+            await db.execute("ALTER TABLE vulnerability_matrix ADD COLUMN category TEXT NOT NULL DEFAULT '未分类'")
         except Exception:
             pass  # column already exists
 

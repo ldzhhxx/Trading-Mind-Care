@@ -10,6 +10,7 @@ class VulnCreate(BaseModel):
     tag: str
     weight: float = 1.0
     description: str = ""
+    category: str = "未分类"
 
     @field_validator("tag")
     @classmethod
@@ -23,6 +24,7 @@ class VulnUpdate(BaseModel):
     tag: str | None = None
     weight: float | None = None
     description: str | None = None
+    category: str | None = None
 
 
 @router.get("")
@@ -45,8 +47,8 @@ async def create_vulnerability(vuln: VulnCreate):
         from datetime import date
         now = date.today().isoformat()
         cursor = await db.execute(
-            "INSERT INTO vulnerability_matrix (tag, weight, hit_count, last_hit_at, description) VALUES (?, ?, 0, ?, ?)",
-            (vuln.tag, vuln.weight, now, vuln.description),
+            "INSERT INTO vulnerability_matrix (tag, weight, hit_count, last_hit_at, description, category) VALUES (?, ?, 0, ?, ?, ?)",
+            (vuln.tag, vuln.weight, now, vuln.description, vuln.category),
         )
         await db.commit()
         return {"id": cursor.lastrowid}
@@ -72,6 +74,9 @@ async def update_vulnerability(vuln_id: int, vuln: VulnUpdate):
         if vuln.description is not None:
             sets.append("description = ?")
             params.append(vuln.description)
+        if vuln.category is not None:
+            sets.append("category = ?")
+            params.append(vuln.category)
         if not sets:
             return {"ok": True}
         params.append(vuln_id)
