@@ -1897,3 +1897,38 @@ async function generateDeepReport(type) {
     btn.disabled = false;
     btn.textContent = type === 'weekly' ? '📊 本周深度报告' : '📊 本月深度报告';
 }
+
+// --- Journal AI Summary ---
+async function journalAiSummary() {
+    const btn = document.getElementById('journal-ai-btn');
+    const box = document.getElementById('journal-ai-result');
+    btn.disabled = true;
+    btn.textContent = '分析中...';
+    box.style.display = 'block';
+    box.textContent = '';
+    try {
+        const res = await fetch('/api/journal/ai-summary', { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const payload = line.slice(6);
+                if (payload === '[DONE]') break;
+                try {
+                    const d = JSON.parse(payload);
+                    if (d.chunk) box.textContent += d.chunk;
+                    if (d.error) box.textContent += `[错误: ${d.error}]`;
+                } catch {}
+            }
+        }
+    } catch (e) { box.textContent = `错误: ${e.message}`; }
+    btn.disabled = false;
+    btn.textContent = '🤖 AI 总结';
+}

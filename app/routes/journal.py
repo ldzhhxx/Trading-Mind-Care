@@ -64,3 +64,45 @@ async def delete_journal(entry_id: int):
         return {"ok": True}
     finally:
         await db.close()
+
+
+@router.post("/ai-summary")
+async def journal_ai_summary():
+    """AI 总结近期日记，发现模式和洞察."""
+    import json
+    from fastapi.responses import StreamingResponse
+    from app.llm import call_llm_stream
+
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, content FROM journal ORDER BY trade_date DESC LIMIT 15"
+        )
+        entries = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if not entries:
+        from fastapi.responses import StreamingResponse
+
+        async def empty():
+            yield f'data: {json.dumps({"chunk": "暂无日记记录，请先写几篇交易日记。"})}\n\n'
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(empty(), media_type="text/event-stream")
+
+    entries_text = "\n".join(f"[{e['trade_date']}] {e['content'][:200]}" for e in entries)
+
+    messages = [
+        {"role": "system", "content": "你是交易心理分析师，擅长从日记中发现隐藏的思维模式和情绪规律。分析交易员的日记，找出：1.反复出现的主题 2.情绪变化规律 3.认知偏差 4.值得强化的正面习惯。200字以内，直击要害。"},
+        {"role": "user", "content": f"以下是交易员近期的日记：\n\n{entries_text}"},
+    ]
+
+    async def stream():
+        try:
+            async for chunk in call_llm_stream(messages):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
