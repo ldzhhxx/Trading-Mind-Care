@@ -807,6 +807,22 @@ async function importReviews() {
     } catch (e) { toast(e.message, 'error'); }
 }
 
+async function checkDataHealth() {
+    const el = document.getElementById('health-result');
+    el.textContent = '检查中...';
+    try {
+        const h = await api('/api/data/health');
+        let html = `<div style="padding:0.6rem;background:${h.healthy ? 'rgba(76,175,80,0.1)' : 'rgba(233,69,96,0.1)'};border-radius:var(--radius)">`;
+        html += `<strong>${h.healthy ? '✅ 数据库健康' : '⚠️ 发现问题'}</strong><br>`;
+        html += `完整性: ${h.integrity} | 大小: ${h.db_size_kb}KB<br>`;
+        html += `复盘: ${h.review_count}条 | 计划: ${h.plan_count}条 | 弱点: ${h.vuln_count}条`;
+        if (h.issues.future_reviews > 0) html += `<br>⚠️ 发现 ${h.issues.future_reviews} 条未来日期的复盘`;
+        if (h.issues.duplicate_reviews > 0) html += `<br>⚠️ 发现 ${h.issues.duplicate_reviews} 组重复复盘`;
+        html += '</div>';
+        el.innerHTML = html;
+    } catch (e) { el.textContent = '检查失败: ' + e.message; }
+}
+
 // --- Utils ---
 function esc(s) {
     const d = document.createElement('div');

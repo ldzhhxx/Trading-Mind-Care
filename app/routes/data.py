@@ -92,3 +92,51 @@ async def import_reviews(file: UploadFile = File(...)):
     finally:
         await db.close()
     return {"imported": imported}
+
+
+@router.get("/health")
+async def data_health_check():
+    """Check database integrity and return health report."""
+    db = await get_db()
+    try:
+        # Integrity check
+        cursor = await db.execute("PRAGMA integrity_check")
+        integrity = (await cursor.fetchone())[0]
+
+        # DB size
+        cursor = await db.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
+        row = await cursor.fetchone()
+        db_size = row[0] if row else 0
+
+        # Record counts
+        cursor = await db.execute("SELECT COUNT(*) as c FROM reviews")
+        review_count = (await cursor.fetchone())["c"]
+        cursor = await db.execute("SELECT COUNT(*) as c FROM plans")
+        plan_count = (await cursor.fetchone())["c"]
+        cursor = await db.execute("SELECT COUNT(*) as c FROM vulnerability_matrix")
+        vuln_count = (await cursor.fetchone())["c"]
+
+        # Orphan detection: reviews with impossible dates
+        cursor = await db.execute("SELECT COUNT(*) as c FROM reviews WHERE trade_date > date('now', '+1 day')")
+        future_reviews = (await cursor.fetchone())["c"]
+
+        # Duplicate detection
+        cursor = await db.execute(
+            "SELECT trade_date, emotion_log, COUNT(*) as c FROM reviews GROUP BY trade_date, emotion_log HAVING c > 1"
+        )
+        duplicates = len(await cursor.fetchall())
+
+        return {
+            "integrity": integrity,
+            "db_size_kb": round(db_size / 1024, 1),
+            "review_count": review_count,
+            "plan_count": plan_count,
+            "vuln_count": vuln_count,
+            "issues": {
+                "future_reviews": future_reviews,
+                "duplicate_reviews": duplicates,
+            },
+            "healthy": integrity == "ok" and future_reviews == 0,
+        }
+    finally:
+        await db.close()

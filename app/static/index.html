@@ -213,7 +213,9 @@
                     <button class="secondary" onclick="exportData('vulnerabilities','json')">导出弱点 JSON</button>
                     <button class="secondary" onclick="exportData('vulnerabilities','csv')">导出弱点 CSV</button>
                     <button class="secondary" onclick="window.open('/api/data/backup')">下载数据库备份</button>
+                    <button class="secondary" onclick="checkDataHealth()">🩺 数据健康检查</button>
                 </div>
+                <div id="health-result" style="margin-top:0.8rem;font-size:0.85rem"></div>
                 <label style="margin-top:1rem">导入复盘数据（JSON）</label>
                 <input type="file" id="import-file" accept=".json" style="margin-top:0.3rem">
                 <button onclick="importReviews()" style="margin-top:0.5rem">导入</button>
