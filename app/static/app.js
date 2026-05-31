@@ -94,13 +94,31 @@ async function addPlan(type) {
 async function editPlan(id) {
     const el = document.querySelector(`#plan-${id} .content`);
     const old = el.textContent;
-    const newVal = prompt('编辑计划：', old);
-    if (newVal === null || newVal.trim() === '' || newVal.trim() === old) return;
-    try {
-        await api(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify({ content: newVal.trim() }) });
-        loadPlans();
-        toast('已更新');
-    } catch (e) { toast(e.message, 'error'); }
+    const input = document.createElement('textarea');
+    input.value = old;
+    input.className = 'edit-inline';
+    input.rows = 2;
+    el.replaceWith(input);
+    input.focus();
+
+    async function save() {
+        const newVal = input.value.trim();
+        if (!newVal || newVal === old) {
+            input.replaceWith(el);
+            return;
+        }
+        try {
+            await api(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify({ content: newVal }) });
+            loadPlans();
+            toast('已更新');
+        } catch (e) { toast(e.message, 'error'); input.replaceWith(el); }
+    }
+
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.replaceWith(el); }
+    });
 }
 
 async function deletePlan(id) {

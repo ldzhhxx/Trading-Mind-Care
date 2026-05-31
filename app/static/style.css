@@ -342,6 +342,20 @@ button.secondary:hover { background: #1a4a7a; }
 .section-header h2 { margin: 0; }
 .section-header h3 { margin: 0; font-size: 1rem; }
 
+/* Inline edit */
+.edit-inline {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: vertical;
+}
+.edit-inline:focus { outline: none; }
+
 /* Responsive */
 @media (max-width: 700px) {
     .plans-grid { grid-template-columns: 1fr; }
