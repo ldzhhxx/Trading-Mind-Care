@@ -81,6 +81,28 @@ async def build_daily_message() -> tuple[str, str]:
             lines.append(f"- AI: {critique[:100]}{'...' if len(critique) > 100 else ''}")
 
     lines.append("\n---\n**🛑 防断手警示：严格执行计划，不要让情绪接管你的账户。**")
+
+    # Add streak info
+    from datetime import timedelta
+    db2 = await get_db()
+    try:
+        streak = 0
+        d = date.today()
+        while True:
+            cursor = await db2.execute(
+                "SELECT COUNT(*) as cnt FROM reviews WHERE trade_date = ?", (d.isoformat(),)
+            )
+            if (await cursor.fetchone())["cnt"] > 0:
+                streak += 1
+                d -= timedelta(days=1)
+            else:
+                break
+    finally:
+        await db2.close()
+
+    if streak >= 3:
+        lines.append(f"\n🔥 **你已连续复盘 {streak} 天，不要断！**")
+
     return title, "\n".join(lines)
 
 
