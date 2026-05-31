@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator
 from datetime import date
 from app.database import get_db
 from app.llm import call_llm, call_llm_stream
+from app.feishu import send_review_notification
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -204,13 +205,20 @@ async def create_review_stream(review: ReviewCreate):
             )
             review_id = cursor.lastrowid
             await db2.commit()
-            # Extract weaknesses in background
+            # Extract weaknesses
+            new_tags = []
             try:
-                await _extract_weaknesses(db2, review.emotion_log, full_critique)
+                new_tags = await _extract_weaknesses(db2, review.emotion_log, full_critique)
             except Exception:
                 pass
         finally:
             await db2.close()
+
+        # Send feishu notification
+        try:
+            await send_review_notification(review.pnl, full_critique, new_tags)
+        except Exception:
+            pass
 
         yield f"data: {json.dumps({'done': True, 'review_id': review_id})}\n\n"
         yield "data: [DONE]\n\n"
@@ -218,8 +226,8 @@ async def create_review_stream(review: ReviewCreate):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-async def _extract_weaknesses(db, emotion_log: str, critique: str):
-    """Extract weaknesses from review and update matrix."""
+async def _extract_weaknesses(db, emotion_log: str, critique: str) -> list[str]:
+    """Extract weaknesses from review and update matrix. Returns list of new tags."""
     messages = [
         {"role": "system", "content": EXTRACT_WEAKNESS_PROMPT},
         {"role": "user", "content": f"交易员倾诉：{emotion_log}\n\n教练点评：{critique}"},
@@ -231,14 +239,16 @@ async def _extract_weaknesses(db, emotion_log: str, critique: str):
 
     weaknesses = json.loads(raw)
     if not isinstance(weaknesses, list):
-        return
+        return []
 
     now = date.today().isoformat()
+    tags = []
     for w in weaknesses:
         tag = w.get("tag", "").strip()
         severity = min(max(float(w.get("severity", 0.5)), 0.1), 1.0)
         if not tag:
             continue
+        tags.append(tag)
         await db.execute("""
             INSERT INTO vulnerability_matrix (tag, weight, hit_count, last_hit_at, description)
             VALUES (?, ?, 1, ?, ?)
@@ -248,3 +258,4 @@ async def _extract_weaknesses(db, emotion_log: str, critique: str):
                 last_hit_at = ?
         """, (tag, severity, now, tag, severity, now))
     await db.commit()
+    return tags
