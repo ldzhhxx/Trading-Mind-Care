@@ -1133,6 +1133,7 @@ function showShortcuts() {
             <div><kbd>T</kbd> 切换主题</div>
             <div><kbd>N</kbd> 新建计划（跳到计划页）</div>
             <div><kbd>R</kbd> 跳到复盘页</div>
+            <div><kbd>C</kbd> 打开 AI 教练</div>
             <div><kbd>Esc</kbd> 关闭弹窗</div>
         </div>
         <button onclick="this.parentElement.parentElement.remove()" style="margin-top:1rem;width:100%">关闭</button>
@@ -1160,6 +1161,9 @@ document.addEventListener('keydown', e => {
         setTimeout(() => document.getElementById('today-input')?.focus(), 100);
     } else if (e.key === 'r' || e.key === 'R') {
         tabs[1]?.click(); // Review tab
+    } else if (e.key === 'c' || e.key === 'C') {
+        document.querySelector('[data-tab="coach"]')?.click();
+        setTimeout(() => document.getElementById('coach-input')?.focus(), 100);
     } else if (e.key === 'Escape') {
         const modal = document.getElementById('shortcuts-modal');
         if (modal) modal.remove();
