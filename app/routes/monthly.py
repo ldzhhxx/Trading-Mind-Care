@@ -106,10 +106,11 @@ async def generate_monthly_summary(year: int | None = None, month: int | None = 
     plan_rate = ((pr["done"] or 0) / pr["total"] * 100) if pr["total"] else 0
     vulns_text = ", ".join(f"{v['tag']}({v['weight']:.1f})" for v in vulns) if vulns else "无"
 
+    win_rate = f"{wins/len(reviews)*100:.0f}%" if reviews else "0%"
     user_msg = f"""【{y}年{m}月数据】
 交易天数: {len(reviews)}
 总盈亏: {total_pnl:.1f}
-胜率: {wins}/{len(reviews)} ({wins/len(reviews)*100:.0f}% if reviews else 0%)
+胜率: {wins}/{len(reviews)} ({win_rate})
 计划执行率: {plan_rate:.0f}%
 活跃弱点: {vulns_text}"""
 

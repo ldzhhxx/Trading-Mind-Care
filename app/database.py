@@ -1,13 +1,17 @@
 """Database initialization and connection management."""
 import os
 import sys
+import logging
 import platform
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 _db_path: str | None = None
 
 
 def get_db_path() -> str:
+    """Get database file path, creating directory if needed."""
     global _db_path
     if _db_path:
         return _db_path
@@ -24,10 +28,12 @@ def get_db_path() -> str:
 
 
 async def get_db() -> aiosqlite.Connection:
-    db = await aiosqlite.connect(get_db_path())
+    """Open a new database connection with WAL mode and foreign keys."""
+    db = await aiosqlite.connect(get_db_path(), timeout=30.0)
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA foreign_keys=ON")
+    await db.execute("PRAGMA busy_timeout=5000")
     return db
 
 

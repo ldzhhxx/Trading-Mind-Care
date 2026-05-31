@@ -1,10 +1,12 @@
 """APScheduler setup for daily tasks."""
+import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import date
 from app.database import get_db
 from app.feishu import send_daily_notification, send_plan_incomplete_alert
 
+logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
 
@@ -18,22 +20,28 @@ async def daily_decay():
         if row and row["value"] == today:
             return
 
-        # Get configurable decay rate
         cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'decay_rate'")
         dr = await cursor.fetchone()
         decay_rate = float(dr["value"]) if dr and dr["value"] else 0.98
 
-        await db.execute(f"UPDATE vulnerability_matrix SET weight = weight * ? WHERE weight > 0.1", (decay_rate,))
+        # Clamp decay rate to valid range
+        decay_rate = max(0.8, min(1.0, decay_rate))
+
+        await db.execute("UPDATE vulnerability_matrix SET weight = weight * ? WHERE weight > 0.1", (decay_rate,))
         await db.execute(
             "INSERT OR REPLACE INTO sys_config (key, value) VALUES ('last_decay_date', ?)",
             (today,),
         )
         await db.commit()
+        logger.info(f"Daily decay applied (rate={decay_rate})")
+    except Exception as e:
+        logger.error(f"Daily decay failed: {e}")
     finally:
         await db.close()
 
 
 def start_scheduler():
+    """Start background scheduler for daily tasks."""
     # Daily notification at configured time (default 8:30)
     scheduler.add_job(send_daily_notification, CronTrigger(hour=8, minute=30), id="daily_notify", replace_existing=True)
     # Daily decay at midnight
@@ -41,3 +49,4 @@ def start_scheduler():
     # Plan incomplete reminder at 20:00
     scheduler.add_job(send_plan_incomplete_alert, CronTrigger(hour=20, minute=0), id="plan_incomplete", replace_existing=True)
     scheduler.start()
+    logger.info("Scheduler started")

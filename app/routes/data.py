@@ -2,7 +2,6 @@
 import csv
 import io
 import json
-import shutil
 from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import StreamingResponse, FileResponse
 from app.database import get_db, get_db_path
