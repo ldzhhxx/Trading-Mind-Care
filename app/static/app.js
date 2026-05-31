@@ -415,6 +415,20 @@ async function submitReview() {
         document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
         localStorage.removeItem('review_draft');
         loadReviews();
+
+        // Auto-check rule violations in background
+        try {
+            const ruleCheck = await api('/api/reviews/check-rules', {
+                method: 'POST',
+                body: JSON.stringify({ emotion_log: emotion, pnl })
+            });
+            if (ruleCheck.violations && ruleCheck.violations.length) {
+                box.textContent += '\n\n⚠️ 纪律违反检测：\n';
+                ruleCheck.violations.forEach(v => {
+                    box.textContent += `❌ [${v.category}] ${v.rule}\n   证据: ${v.evidence}\n`;
+                });
+            }
+        } catch(e) {} // Non-critical
     } catch (e) {
         box.textContent = 'AI 暂不可用，复盘已保存。请在设置中配置 LLM。';
         box.className = 'critique-box warning-mode';
@@ -1954,4 +1968,34 @@ async function journalAiSummary() {
     } catch (e) { box.textContent = `错误: ${e.message}`; }
     btn.disabled = false;
     btn.textContent = '🤖 AI 总结';
+}
+
+async function journalWeeklyDigest() {
+    const box = document.getElementById('journal-ai-result');
+    box.style.display = 'block';
+    box.textContent = '生成本周精华摘要...';
+    try {
+        const res = await fetch('/api/journal/weekly-digest', { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        box.textContent = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const payload = line.slice(6);
+                if (payload === '[DONE]') break;
+                try {
+                    const d = JSON.parse(payload);
+                    if (d.chunk) box.textContent += d.chunk;
+                    if (d.error) box.textContent += `[错误: ${d.error}]`;
+                } catch {}
+            }
+        }
+    } catch (e) { box.textContent = `错误: ${e.message}`; }
 }
