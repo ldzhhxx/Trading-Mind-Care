@@ -347,6 +347,21 @@ button.secondary:hover { background: #1a4a7a; }
 .section-header h2 { margin: 0; }
 .section-header h3 { margin: 0; font-size: 1rem; }
 
+/* Template chips */
+.template-chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--surface2);
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin: 0.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.template-chip:hover { border-color: var(--accent); background: rgba(233,69,96,0.1); }
+
 /* PnL trend chart */
 .pnl-trend {
     display: flex;

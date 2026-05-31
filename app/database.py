@@ -66,6 +66,11 @@ async def init_db():
             description TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS plan_templates (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL UNIQUE
+        );
+
         CREATE INDEX IF NOT EXISTS idx_plans_date ON plans(trade_date);
         CREATE INDEX IF NOT EXISTS idx_reviews_date ON reviews(trade_date);
         """)

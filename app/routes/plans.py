@@ -119,3 +119,39 @@ async def get_warnings():
         return [dict(row) for row in rows]
     finally:
         await db.close()
+
+
+@router.get("/templates")
+async def list_templates():
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM plan_templates ORDER BY id DESC")
+        return [dict(row) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
+@router.post("/templates")
+async def create_template(plan: PlanUpdate):
+    db = await get_db()
+    try:
+        cursor = await db.execute("INSERT INTO plan_templates (content) VALUES (?)", (plan.content,))
+        await db.commit()
+        return {"id": cursor.lastrowid}
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            raise HTTPException(status_code=409, detail="模板已存在")
+        raise
+    finally:
+        await db.close()
+
+
+@router.delete("/templates/{tpl_id}")
+async def delete_template(tpl_id: int):
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM plan_templates WHERE id = ?", (tpl_id,))
+        await db.commit()
+        return {"ok": True}
+    finally:
+        await db.close()

@@ -52,6 +52,7 @@ async function loadPlans() {
         renderPlans('today-plans', todayPlans);
         renderPlans('tomorrow-plans', tomorrowPlans);
         renderWarnings(warnings);
+        loadTemplates();
     } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -88,6 +89,39 @@ async function addPlan(type) {
         await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content }) });
         input.value = '';
         loadPlans();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function saveAsTemplate(type) {
+    const input = document.getElementById(type + '-input');
+    const content = input.value.trim();
+    if (!content) { toast('请先输入计划内容', 'error'); return; }
+    try {
+        await api('/api/plans/templates', { method: 'POST', body: JSON.stringify({ content }) });
+        toast('已保存为模板');
+        loadTemplates();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function loadTemplates() {
+    try {
+        const tpls = await api('/api/plans/templates');
+        const el = document.getElementById('templates-list');
+        if (!tpls.length) { el.innerHTML = '<span style="color:var(--text-dim);font-size:0.85rem">暂无模板</span>'; return; }
+        el.innerHTML = tpls.map(t => `<span class="template-chip" onclick="insertTemplate('${esc(t.content)}')">${esc(t.content)}<button onclick="event.stopPropagation();deleteTemplate(${t.id})" style="background:none;border:none;color:var(--text-dim);cursor:pointer;margin-left:0.3rem;padding:0">✕</button></span>`).join('');
+    } catch (e) {}
+}
+
+function insertTemplate(content) {
+    const input = document.getElementById('today-input');
+    input.value = content;
+    input.focus();
+}
+
+async function deleteTemplate(id) {
+    try {
+        await api(`/api/plans/templates/${id}`, { method: 'DELETE' });
+        loadTemplates();
     } catch (e) { toast(e.message, 'error'); }
 }
 
