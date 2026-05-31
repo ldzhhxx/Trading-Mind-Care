@@ -1656,3 +1656,83 @@ async function deleteGoal(id) {
     await api(`/api/goals/${id}`, { method: 'DELETE' });
     loadHabits();
 }
+
+// --- AI Coach ---
+let coachHistory = [];
+
+function renderCoachMessages() {
+    const box = document.getElementById('coach-messages');
+    if (!coachHistory.length) {
+        box.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:2rem;font-size:0.9rem">开始和 AI 教练对话吧 👆</p>';
+        return;
+    }
+    box.innerHTML = coachHistory.map(m => {
+        const cls = m.role === 'user' ? 'coach-msg-user' : 'coach-msg-ai';
+        const label = m.role === 'user' ? '你' : '🤖 教练';
+        return `<div class="${cls}" style="margin-bottom:0.8rem;padding:0.6rem;border-radius:var(--radius);${m.role === 'user' ? 'background:var(--accent);color:#fff;margin-left:20%' : 'background:var(--surface2);margin-right:20%'}"><strong>${label}：</strong>${m.content}</div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+}
+
+function coachQuick(msg) {
+    document.getElementById('coach-input').value = msg;
+    sendCoachMessage();
+}
+
+function clearCoachHistory() {
+    coachHistory = [];
+    renderCoachMessages();
+}
+
+async function sendCoachMessage() {
+    const input = document.getElementById('coach-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    coachHistory.push({ role: 'user', content: msg });
+    renderCoachMessages();
+
+    const btn = document.getElementById('coach-send-btn');
+    btn.disabled = true;
+    btn.textContent = '思考中...';
+
+    // Add placeholder for AI response
+    coachHistory.push({ role: 'assistant', content: '' });
+    renderCoachMessages();
+
+    try {
+        const res = await fetch('/api/coach/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, history: coachHistory.slice(0, -1) })
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let aiText = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const payload = line.slice(6);
+                if (payload === '[DONE]') break;
+                try {
+                    const d = JSON.parse(payload);
+                    if (d.chunk) aiText += d.chunk;
+                    if (d.error) aiText += `[错误: ${d.error}]`;
+                } catch {}
+            }
+            coachHistory[coachHistory.length - 1].content = aiText;
+            renderCoachMessages();
+        }
+    } catch (e) {
+        coachHistory[coachHistory.length - 1].content = `[网络错误: ${e.message}]`;
+        renderCoachMessages();
+    }
+    btn.disabled = false;
+    btn.textContent = '发送';
+}

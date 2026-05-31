@@ -18,6 +18,7 @@
         <nav>
             <button class="tab active" data-tab="plans">📋 计划</button>
             <button class="tab" data-tab="review">🔥 复盘</button>
+            <button class="tab" data-tab="coach">💬 教练</button>
             <button class="tab" data-tab="matrix">📊 弱点矩阵</button>
             <button class="tab" data-tab="stats">📈 统计</button>
             <button class="tab" data-tab="analytics">🔬 深度分析</button>
@@ -133,6 +134,25 @@
             </div>
             <div id="review-history"></div>
             <div id="review-pagination" style="margin-top:1rem;text-align:center"></div>
+        </section>
+
+        <!-- Coach Tab -->
+        <section id="tab-coach" class="tab-content">
+            <h2 style="margin-bottom:1rem">💬 AI 交易教练</h2>
+            <p class="hint" style="margin-bottom:1rem">随时和 AI 教练讨论交易问题：心态管理、策略复盘、纪律执行、情绪控制...</p>
+            <div id="coach-messages" style="max-height:50vh;overflow-y:auto;margin-bottom:1rem;padding:0.5rem;border:1px solid var(--surface2);border-radius:var(--radius);background:var(--surface)"></div>
+            <div style="display:flex;gap:0.5rem">
+                <textarea id="coach-input" rows="2" placeholder="输入你想讨论的交易问题..." style="flex:1;background:var(--surface);border:1px solid var(--surface2);color:var(--text);padding:0.6rem;border-radius:var(--radius);font-size:0.9rem;font-family:inherit;resize:vertical"></textarea>
+                <button onclick="sendCoachMessage()" id="coach-send-btn" style="margin:0;padding:0.6rem 1.2rem;align-self:flex-end">发送</button>
+            </div>
+            <div style="margin-top:0.8rem;display:flex;gap:0.3rem;flex-wrap:wrap">
+                <button class="secondary" onclick="coachQuick('我今天情绪不太稳定，怎么调整？')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">情绪调整</button>
+                <button class="secondary" onclick="coachQuick('我连续亏损了，该怎么办？')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">连亏应对</button>
+                <button class="secondary" onclick="coachQuick('我总是拿不住盈利单，怎么改善？')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">拿不住单</button>
+                <button class="secondary" onclick="coachQuick('帮我分析一下我最近的交易状态')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">状态分析</button>
+                <button class="secondary" onclick="coachQuick('我想制定明天的交易计划，有什么建议？')" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">计划建议</button>
+                <button class="secondary" onclick="clearCoachHistory()" style="margin:0;padding:0.2rem 0.5rem;font-size:0.75rem">🗑️ 清空对话</button>
+            </div>
         </section>
 
         <!-- Matrix Tab -->
