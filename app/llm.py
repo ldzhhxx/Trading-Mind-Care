@@ -1,7 +1,9 @@
-"""LLM API adapter with retry logic."""
+"""LLM API adapter with retry logic and streaming support."""
 import httpx
 import time
 import json
+import asyncio
+from typing import AsyncGenerator
 from app.database import get_db
 
 _config_cache: dict = {}
@@ -19,7 +21,7 @@ async def _load_config() -> dict:
     return _config_cache
 
 
-async def call_llm(messages: list[dict], stream: bool = False) -> str:
+async def call_llm(messages: list[dict]) -> str:
     """Call LLM API. Returns response text or raises exception."""
     config = await _load_config()
     base_url = config.get("base_url", "").rstrip("/")
@@ -36,7 +38,6 @@ async def call_llm(messages: list[dict], stream: bool = False) -> str:
     last_error = None
     for attempt, delay in enumerate([0, 1, 3]):
         if delay:
-            import asyncio
             await asyncio.sleep(delay)
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -48,6 +49,39 @@ async def call_llm(messages: list[dict], stream: bool = False) -> str:
             last_error = e
 
     raise last_error
+
+
+async def call_llm_stream(messages: list[dict]) -> AsyncGenerator[str, None]:
+    """Call LLM API with streaming. Yields text chunks."""
+    config = await _load_config()
+    base_url = config.get("base_url", "").rstrip("/")
+    api_key = config.get("api_key", "")
+    model = config.get("model_name", "")
+
+    if not all([base_url, api_key, model]):
+        raise ValueError("LLM 未配置完整，请在设置页填写 API 信息")
+
+    url = f"{base_url}/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {"model": model, "messages": messages, "stream": True}
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    delta = chunk["choices"][0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        yield content
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    continue
 
 
 async def test_llm_connection(base_url: str, api_key: str, model_name: str) -> dict:

@@ -4,12 +4,13 @@ import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.database import init_db
 from app.scheduler import start_scheduler, daily_decay
 from app.feishu import send_daily_notification
-from app.routes import plans, reviews, vulnerabilities, settings, notifications
+from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats
 
 
 def get_static_dir() -> str:
@@ -39,6 +40,7 @@ app.include_router(reviews.router)
 app.include_router(vulnerabilities.router)
 app.include_router(settings.router)
 app.include_router(notifications.router)
+app.include_router(stats.router)
 
 # Static files
 static_dir = get_static_dir()

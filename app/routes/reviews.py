@@ -2,10 +2,11 @@
 import json
 import math
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 from datetime import date
 from app.database import get_db
-from app.llm import call_llm
+from app.llm import call_llm, call_llm_stream
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -48,16 +49,19 @@ class ReviewCreate(BaseModel):
 
 
 @router.get("")
-async def list_reviews(trade_date: str | None = None, limit: int = 20):
+async def list_reviews(trade_date: str | None = None, limit: int = 20, offset: int = 0):
+    """List reviews with pagination support."""
     db = await get_db()
     try:
         if trade_date:
             cursor = await db.execute(
-                "SELECT * FROM reviews WHERE trade_date = ? ORDER BY created_at DESC", (trade_date,)
+                "SELECT * FROM reviews WHERE trade_date = ? ORDER BY created_at DESC",
+                (trade_date,),
             )
         else:
             cursor = await db.execute(
-                "SELECT * FROM reviews ORDER BY created_at DESC LIMIT ?", (limit,)
+                "SELECT * FROM reviews ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
             )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
@@ -69,7 +73,6 @@ async def list_reviews(trade_date: str | None = None, limit: int = 20):
 async def create_review(review: ReviewCreate):
     trade_date = review.trade_date or date.today().isoformat()
 
-    # Fetch today's plans for context
     db = await get_db()
     try:
         cursor = await db.execute(
@@ -78,7 +81,6 @@ async def create_review(review: ReviewCreate):
         plan_rows = await cursor.fetchall()
         plans_text = "\n".join(f"- {row['content']}" for row in plan_rows) if plan_rows else "（今日无计划）"
 
-        # Build LLM messages
         pnl_text = f"盈亏: {review.pnl}" if review.pnl is not None else "盈亏: 未填写"
         user_msg = f"""【今日计划】
 {plans_text}
@@ -94,14 +96,12 @@ async def create_review(review: ReviewCreate):
             {"role": "user", "content": user_msg},
         ]
 
-        # Try LLM call, graceful degradation
         ai_critique = None
         try:
             ai_critique = await call_llm(messages)
         except Exception:
             ai_critique = None
 
-        # Save review
         cursor = await db.execute(
             "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
             (trade_date, review.pnl, review.emotion_log, ai_critique),
@@ -109,7 +109,6 @@ async def create_review(review: ReviewCreate):
         review_id = cursor.lastrowid
         await db.commit()
 
-        # Async weakness extraction (best effort)
         if ai_critique:
             try:
                 await _extract_weaknesses(db, review.emotion_log, ai_critique)
@@ -125,6 +124,80 @@ async def create_review(review: ReviewCreate):
         await db.close()
 
 
+@router.post("/stream")
+async def create_review_stream(review: ReviewCreate):
+    """Submit review with SSE streaming AI critique."""
+    trade_date = review.trade_date or date.today().isoformat()
+
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT content FROM plans WHERE trade_date = ?", (trade_date,)
+        )
+        plan_rows = await cursor.fetchall()
+        plans_text = "\n".join(f"- {row['content']}" for row in plan_rows) if plan_rows else "（今日无计划）"
+    finally:
+        await db.close()
+
+    pnl_text = f"盈亏: {review.pnl}" if review.pnl is not None else "盈亏: 未填写"
+    user_msg = f"""【今日计划】
+{plans_text}
+
+【实际结果】
+{pnl_text}
+
+【交易员倾诉】
+{review.emotion_log}"""
+
+    messages = [
+        {"role": "system", "content": CRITIQUE_SYSTEM_PROMPT},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async def event_generator():
+        full_critique = ""
+        try:
+            async for chunk in call_llm_stream(messages):
+                full_critique += chunk
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            # Save without critique
+            db2 = await get_db()
+            try:
+                await db2.execute(
+                    "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
+                    (trade_date, review.pnl, review.emotion_log, None),
+                )
+                await db2.commit()
+            finally:
+                await db2.close()
+            yield "data: [DONE]\n\n"
+            return
+
+        # Save review with full critique
+        db2 = await get_db()
+        try:
+            cursor = await db2.execute(
+                "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
+                (trade_date, review.pnl, review.emotion_log, full_critique),
+            )
+            review_id = cursor.lastrowid
+            await db2.commit()
+            # Extract weaknesses in background
+            try:
+                await _extract_weaknesses(db2, review.emotion_log, full_critique)
+            except Exception:
+                pass
+        finally:
+            await db2.close()
+
+        yield f"data: {json.dumps({'done': True, 'review_id': review_id})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 async def _extract_weaknesses(db, emotion_log: str, critique: str):
     """Extract weaknesses from review and update matrix."""
     messages = [
@@ -132,8 +205,6 @@ async def _extract_weaknesses(db, emotion_log: str, critique: str):
         {"role": "user", "content": f"交易员倾诉：{emotion_log}\n\n教练点评：{critique}"},
     ]
     raw = await call_llm(messages)
-
-    # Parse JSON from response
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]

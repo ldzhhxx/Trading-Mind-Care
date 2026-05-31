@@ -7,51 +7,66 @@ document.querySelectorAll('.tab').forEach(btn => {
         document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-        // Load data for active tab
         const tab = btn.dataset.tab;
         if (tab === 'plans') loadPlans();
         else if (tab === 'review') loadReviews();
         else if (tab === 'matrix') loadMatrix();
+        else if (tab === 'stats') loadStats();
         else if (tab === 'settings') loadSettings();
     });
 });
 
 // --- API helpers ---
 async function api(url, opts = {}) {
-    const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json' },
-        ...opts,
-    });
-    return res.json();
+    try {
+        const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+            throw new Error(err.detail || `请求失败 (${res.status})`);
+        }
+        return res.json();
+    } catch (e) {
+        if (e.message === 'Failed to fetch') throw new Error('网络连接失败，请检查服务是否运行');
+        throw e;
+    }
+}
+
+function toast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
 }
 
 // --- Plans ---
 async function loadPlans() {
     const today = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-
-    const [todayPlans, tomorrowPlans, warnings] = await Promise.all([
-        api(`/api/plans?trade_date=${today}&plan_type=today`),
-        api(`/api/plans?trade_date=${tomorrow}&plan_type=tomorrow`),
-        api('/api/plans/warnings'),
-    ]);
-
-    renderPlans('today-plans', todayPlans);
-    renderPlans('tomorrow-plans', tomorrowPlans);
-    renderWarnings(warnings);
+    try {
+        const [todayPlans, tomorrowPlans, warnings] = await Promise.all([
+            api(`/api/plans?trade_date=${today}&plan_type=today`),
+            api(`/api/plans?trade_date=${tomorrow}&plan_type=tomorrow`),
+            api('/api/plans/warnings'),
+        ]);
+        renderPlans('today-plans', todayPlans);
+        renderPlans('tomorrow-plans', tomorrowPlans);
+        renderWarnings(warnings);
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 function renderPlans(containerId, plans) {
     const el = document.getElementById(containerId);
     if (!plans.length) {
-        el.innerHTML = '<p style="color:var(--text-dim);font-size:0.85rem">暂无计划</p>';
+        el.innerHTML = '<div class="empty-state"><div class="icon">📝</div><div class="msg">暂无计划</div><div class="hint">在下方输入框添加你的交易计划</div></div>';
         return;
     }
     el.innerHTML = plans.map(p => `
-        <div class="plan-item">
+        <div class="plan-item" id="plan-${p.id}">
             <span class="content">${esc(p.content)}</span>
             <span class="actions">
-                <button onclick="deletePlan(${p.id})">✕</button>
+                <button onclick="editPlan(${p.id})" title="编辑">✎</button>
+                <button onclick="deletePlan(${p.id})" title="删除">✕</button>
             </span>
         </div>
     `).join('');
@@ -69,152 +84,290 @@ async function addPlan(type) {
     const input = document.getElementById(type + '-input');
     const content = input.value.trim();
     if (!content) return;
-    await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content }) });
-    input.value = '';
-    loadPlans();
+    try {
+        await api('/api/plans', { method: 'POST', body: JSON.stringify({ plan_type: type, content }) });
+        input.value = '';
+        loadPlans();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function editPlan(id) {
+    const el = document.querySelector(`#plan-${id} .content`);
+    const old = el.textContent;
+    const newVal = prompt('编辑计划：', old);
+    if (newVal === null || newVal.trim() === '' || newVal.trim() === old) return;
+    try {
+        await api(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify({ content: newVal.trim() }) });
+        loadPlans();
+        toast('已更新');
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 async function deletePlan(id) {
-    await api(`/api/plans/${id}`, { method: 'DELETE' });
-    loadPlans();
+    if (!confirm('确定删除？')) return;
+    try {
+        await api(`/api/plans/${id}`, { method: 'DELETE' });
+        loadPlans();
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 // --- Reviews ---
+let reviewPage = 0;
+const PAGE_SIZE = 10;
+
 async function submitReview() {
     const btn = document.getElementById('submit-review');
     const emotion = document.getElementById('emotion-input').value.trim();
-    if (!emotion) { alert('请填写交易倾诉'); return; }
+    if (!emotion) { toast('请填写交易倾诉', 'error'); return; }
 
     const pnlVal = document.getElementById('pnl-input').value;
     const pnl = pnlVal ? parseFloat(pnlVal) : null;
 
     btn.disabled = true;
-    btn.textContent = '正在分析...';
+    btn.innerHTML = '<span class="loading-spinner"></span>AI 正在分析你的交易...';
+
+    const box = document.getElementById('critique-result');
+    box.textContent = '';
+    box.className = 'critique-box';
+    box.style.display = 'block';
 
     try {
-        const result = await api('/api/reviews', {
+        const resp = await fetch('/api/reviews/stream', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pnl, emotion_log: emotion }),
         });
 
-        const box = document.getElementById('critique-result');
-        if (result.ai_critique) {
-            box.textContent = result.ai_critique;
-            box.style.display = 'block';
-        } else {
-            box.textContent = 'AI 暂不可用，复盘已保存。请在设置中配置 LLM。';
-            box.style.display = 'block';
-            box.style.borderColor = 'var(--warning)';
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6);
+                if (data === '[DONE]') break;
+                try {
+                    const msg = JSON.parse(data);
+                    if (msg.chunk) box.textContent += msg.chunk;
+                    else if (msg.error) {
+                        box.textContent = 'AI 暂不可用：' + msg.error + '\n复盘已保存。';
+                        box.className = 'critique-box warning-mode';
+                    }
+                } catch (e) {}
+            }
         }
 
         document.getElementById('emotion-input').value = '';
         document.getElementById('pnl-input').value = '';
         loadReviews();
+    } catch (e) {
+        box.textContent = 'AI 暂不可用，复盘已保存。请在设置中配置 LLM。';
+        box.className = 'critique-box warning-mode';
+        // Fallback: submit without streaming
+        try {
+            await api('/api/reviews', { method: 'POST', body: JSON.stringify({ pnl, emotion_log: emotion }) });
+            loadReviews();
+        } catch (e2) { toast(e2.message, 'error'); }
     } finally {
         btn.disabled = false;
-        btn.textContent = '提交复盘 — 接受拷打';
+        btn.innerHTML = '提交复盘 — 接受拷打';
     }
 }
 
 async function loadReviews() {
-    const reviews = await api('/api/reviews?limit=10');
-    const el = document.getElementById('review-history');
-    if (!reviews.length) {
-        el.innerHTML = '<p style="color:var(--text-dim)">暂无复盘记录</p>';
-        return;
-    }
-    el.innerHTML = reviews.map(r => {
-        const pnlClass = r.pnl > 0 ? 'pnl-pos' : r.pnl < 0 ? 'pnl-neg' : '';
-        const pnlText = r.pnl !== null ? `<span class="${pnlClass}">${r.pnl > 0 ? '+' : ''}${r.pnl}</span>` : '';
-        return `<div class="review-history-item">
-            <div class="date">${r.trade_date} ${pnlText}</div>
-            <div>${esc(r.emotion_log).slice(0, 100)}${r.emotion_log.length > 100 ? '...' : ''}</div>
-        </div>`;
-    }).join('');
+    try {
+        const reviews = await api(`/api/reviews?limit=${PAGE_SIZE}&offset=${reviewPage * PAGE_SIZE}`);
+        const el = document.getElementById('review-history');
+        if (!reviews.length && reviewPage === 0) {
+            el.innerHTML = '<div class="empty-state"><div class="icon">🔥</div><div class="msg">暂无复盘记录</div><div class="hint">提交你的第一次复盘，接受 AI 拷打</div></div>';
+            document.getElementById('review-pagination').innerHTML = '';
+            return;
+        }
+        el.innerHTML = reviews.map(r => {
+            const pnlClass = r.pnl > 0 ? 'pnl-pos' : r.pnl < 0 ? 'pnl-neg' : '';
+            const pnlText = r.pnl !== null ? `<span class="${pnlClass}">${r.pnl > 0 ? '+' : ''}${r.pnl}</span>` : '';
+            const critique = r.ai_critique ? esc(r.ai_critique) : '<em style="color:var(--text-dim)">无 AI 点评</em>';
+            return `<div class="review-history-item" onclick="this.classList.toggle('expanded')">
+                <div class="meta"><span class="date">${r.trade_date}</span>${pnlText}</div>
+                <div class="summary">${esc(r.emotion_log).slice(0, 80)}${r.emotion_log.length > 80 ? '...' : ''}</div>
+                <div class="critique-expand">${critique}</div>
+            </div>`;
+        }).join('');
+
+        // Pagination
+        const pag = document.getElementById('review-pagination');
+        let html = '';
+        if (reviewPage > 0) html += `<button class="secondary" onclick="reviewPage--;loadReviews()" style="margin:0 0.3rem">← 上一页</button>`;
+        if (reviews.length === PAGE_SIZE) html += `<button class="secondary" onclick="reviewPage++;loadReviews()" style="margin:0 0.3rem">下一页 →</button>`;
+        pag.innerHTML = html;
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function exportReviews() {
+    try {
+        const data = await api('/api/reviews?limit=9999');
+        downloadJSON(data, 'reviews.json');
+        toast('导出成功');
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 // --- Matrix ---
 async function loadMatrix() {
-    const vulns = await api('/api/vulnerabilities');
-    const tbody = document.querySelector('#matrix-table tbody');
-    if (!vulns.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-dim)">暂无数据，完成复盘后系统会自动提取弱点</td></tr>';
-        return;
-    }
-    tbody.innerHTML = vulns.map(v => `<tr>
-        <td><strong>${esc(v.tag)}</strong></td>
-        <td>${v.weight.toFixed(2)}</td>
-        <td>${v.hit_count}</td>
-        <td>${v.last_hit_at || '-'}</td>
-        <td><button onclick="deleteVuln(${v.id})" class="secondary" style="padding:0.2rem 0.5rem;margin:0">删除</button></td>
-    </tr>`).join('');
+    try {
+        const vulns = await api('/api/vulnerabilities');
+        const tbody = document.querySelector('#matrix-table tbody');
+        const chart = document.getElementById('matrix-chart');
+
+        if (!vulns.length) {
+            tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="icon">📊</div><div class="msg">暂无数据</div><div class="hint">完成复盘后系统会自动提取弱点</div></div></td></tr>';
+            chart.innerHTML = '';
+            return;
+        }
+
+        const maxW = Math.max(...vulns.map(v => v.weight));
+        // Bar chart
+        chart.innerHTML = '<div style="margin-bottom:1.5rem">' + vulns.slice(0, 8).map(v => {
+            const pct = Math.max(5, (v.weight / maxW) * 100);
+            return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
+                <span style="min-width:6rem;font-size:0.8rem;text-align:right;color:var(--text-dim)">${esc(v.tag)}</span>
+                <div style="flex:1;background:var(--surface);border-radius:3px;height:8px;overflow:hidden">
+                    <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:3px;transition:width 0.3s"></div>
+                </div>
+                <span style="font-size:0.8rem;font-family:var(--font-mono);min-width:2.5rem">${v.weight.toFixed(1)}</span>
+            </div>`;
+        }).join('') + '</div>';
+
+        tbody.innerHTML = vulns.map(v => {
+            const pct = Math.max(5, (v.weight / maxW) * 100);
+            return `<tr>
+                <td><strong>${esc(v.tag)}</strong></td>
+                <td><div class="weight-bar-container"><div class="weight-bar" style="width:${pct}px"></div><span class="weight-value">${v.weight.toFixed(2)}</span></div></td>
+                <td>${v.hit_count}</td>
+                <td>${v.last_hit_at || '-'}</td>
+                <td><button onclick="deleteVuln(${v.id})" class="secondary" style="padding:0.2rem 0.5rem;margin:0;font-size:0.8rem">删除</button></td>
+            </tr>`;
+        }).join('');
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 async function deleteVuln(id) {
-    await api(`/api/vulnerabilities/${id}`, { method: 'DELETE' });
-    loadMatrix();
+    if (!confirm('确定删除？')) return;
+    try {
+        await api(`/api/vulnerabilities/${id}`, { method: 'DELETE' });
+        loadMatrix();
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+async function exportMatrix() {
+    try {
+        const data = await api('/api/vulnerabilities');
+        downloadJSON(data, 'vulnerability_matrix.json');
+        toast('导出成功');
+    } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Stats ---
+async function loadStats() {
+    try {
+        const data = await api('/api/stats');
+        const el = document.getElementById('stats-content');
+        const pnlClass = data.total_pnl >= 0 ? 'positive' : 'negative';
+        el.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-card"><div class="value">${data.review_count}</div><div class="label">总复盘次数</div></div>
+                <div class="stat-card"><div class="value ${pnlClass}">${data.total_pnl >= 0 ? '+' : ''}${data.total_pnl.toFixed(1)}</div><div class="label">累计盈亏</div></div>
+                <div class="stat-card"><div class="value">${data.week_reviews}</div><div class="label">本周复盘</div></div>
+                <div class="stat-card"><div class="value">${data.streak_days}</div><div class="label">连续复盘天数</div></div>
+            </div>
+            ${data.top_weaknesses.length ? `
+            <h3 style="margin:1.5rem 0 0.8rem">高频弱点 Top 5</h3>
+            ${data.top_weaknesses.map(w => {
+                const pct = Math.max(8, (w.weight / (data.top_weaknesses[0]?.weight || 1)) * 100);
+                return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+                    <span style="min-width:7rem;font-size:0.85rem">${esc(w.tag)}</span>
+                    <div style="flex:1;background:var(--surface);border-radius:3px;height:10px;overflow:hidden">
+                        <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:3px"></div>
+                    </div>
+                    <span style="font-size:0.8rem;color:var(--text-dim)">${w.hit_count}次</span>
+                </div>`;
+            }).join('')}` : '<div class="empty-state"><div class="icon">📈</div><div class="msg">暂无统计数据</div></div>'}
+        `;
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 // --- Settings ---
 async function loadSettings() {
-    const cfg = await api('/api/settings');
-    document.getElementById('cfg-base-url').value = cfg.base_url || '';
-    document.getElementById('cfg-api-key').value = cfg.api_key || '';
-    document.getElementById('cfg-model-name').value = cfg.model_name || '';
-    document.getElementById('cfg-feishu-webhook').value = cfg.feishu_webhook || '';
-    document.getElementById('cfg-notify-time').value = cfg.notify_time || '08:30';
+    try {
+        const cfg = await api('/api/settings');
+        document.getElementById('cfg-base-url').value = cfg.base_url || '';
+        document.getElementById('cfg-api-key').value = cfg.api_key || '';
+        document.getElementById('cfg-model-name').value = cfg.model_name || '';
+        document.getElementById('cfg-feishu-webhook').value = cfg.feishu_webhook || '';
+        document.getElementById('cfg-notify-time').value = cfg.notify_time || '08:30';
+    } catch (e) { toast(e.message, 'error'); }
 }
 
 async function saveLLM() {
-    await api('/api/settings/llm', {
-        method: 'POST',
-        body: JSON.stringify({
-            base_url: document.getElementById('cfg-base-url').value,
-            api_key: document.getElementById('cfg-api-key').value,
-            model_name: document.getElementById('cfg-model-name').value,
-        }),
-    });
-    showResult('llm-test-result', '✅ 已保存', true);
+    try {
+        await api('/api/settings/llm', {
+            method: 'POST',
+            body: JSON.stringify({
+                base_url: document.getElementById('cfg-base-url').value,
+                api_key: document.getElementById('cfg-api-key').value,
+                model_name: document.getElementById('cfg-model-name').value,
+            }),
+        });
+        showResult('llm-test-result', '✅ 已保存', true);
+    } catch (e) { showResult('llm-test-result', `❌ ${e.message}`, false); }
 }
 
 async function testLLM() {
     const el = document.getElementById('llm-test-result');
     el.textContent = '测试中...';
-    const result = await api('/api/settings/test-llm', {
-        method: 'POST',
-        body: JSON.stringify({
-            base_url: document.getElementById('cfg-base-url').value,
-            api_key: document.getElementById('cfg-api-key').value,
-            model_name: document.getElementById('cfg-model-name').value,
-        }),
-    });
-    if (result.success) {
-        showResult('llm-test-result', `✅ 连接成功 | 模型: ${result.model} | 延迟: ${result.ttft_ms}ms`, true);
-    } else {
-        showResult('llm-test-result', `❌ 失败: ${result.error}`, false);
-    }
+    try {
+        const result = await api('/api/settings/test-llm', {
+            method: 'POST',
+            body: JSON.stringify({
+                base_url: document.getElementById('cfg-base-url').value,
+                api_key: document.getElementById('cfg-api-key').value,
+                model_name: document.getElementById('cfg-model-name').value,
+            }),
+        });
+        if (result.success) {
+            showResult('llm-test-result', `✅ 连接成功 | 模型: ${result.model} | 延迟: ${result.ttft_ms}ms`, true);
+        } else {
+            showResult('llm-test-result', `❌ 失败: ${result.error}`, false);
+        }
+    } catch (e) { showResult('llm-test-result', `❌ ${e.message}`, false); }
 }
 
 async function saveFeishu() {
-    await api('/api/settings/feishu', {
-        method: 'POST',
-        body: JSON.stringify({
-            feishu_webhook: document.getElementById('cfg-feishu-webhook').value,
-            notify_time: document.getElementById('cfg-notify-time').value,
-        }),
-    });
-    showResult('feishu-test-result', '✅ 已保存', true);
+    try {
+        await api('/api/settings/feishu', {
+            method: 'POST',
+            body: JSON.stringify({
+                feishu_webhook: document.getElementById('cfg-feishu-webhook').value,
+                notify_time: document.getElementById('cfg-notify-time').value,
+            }),
+        });
+        showResult('feishu-test-result', '✅ 已保存', true);
+    } catch (e) { showResult('feishu-test-result', `❌ ${e.message}`, false); }
 }
 
 async function testFeishu() {
     const el = document.getElementById('feishu-test-result');
     el.textContent = '发送中...';
-    const result = await api('/api/notifications/test-feishu', { method: 'POST' });
-    if (result.success) {
-        showResult('feishu-test-result', '✅ 发送成功，请检查飞书', true);
-    } else {
-        showResult('feishu-test-result', `❌ ${result.error}`, false);
-    }
+    try {
+        const result = await api('/api/notifications/test-feishu', { method: 'POST' });
+        if (result.success) showResult('feishu-test-result', '✅ 发送成功，请检查飞书', true);
+        else showResult('feishu-test-result', `❌ ${result.error}`, false);
+    } catch (e) { showResult('feishu-test-result', `❌ ${e.message}`, false); }
 }
 
 function showResult(id, msg, success) {
@@ -229,6 +382,26 @@ function esc(s) {
     d.textContent = s;
     return d.innerHTML;
 }
+
+function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// Keyboard shortcut: Enter to submit in plan inputs
+document.querySelectorAll('.plan-input textarea').forEach(ta => {
+    ta.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const type = ta.id.replace('-input', '');
+            addPlan(type);
+        }
+    });
+});
 
 // Initial load
 loadPlans();

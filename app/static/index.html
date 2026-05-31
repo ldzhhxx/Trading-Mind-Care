@@ -13,6 +13,7 @@
             <button class="tab active" data-tab="plans">📋 计划</button>
             <button class="tab" data-tab="review">🔥 复盘</button>
             <button class="tab" data-tab="matrix">📊 弱点矩阵</button>
+            <button class="tab" data-tab="stats">📈 统计</button>
             <button class="tab" data-tab="settings">⚙️ 设置</button>
         </nav>
     </header>
@@ -26,7 +27,7 @@
                     <h2>今日计划</h2>
                     <div id="today-plans"></div>
                     <div class="plan-input">
-                        <textarea id="today-input" placeholder="输入今日计划..." rows="3"></textarea>
+                        <textarea id="today-input" placeholder="输入今日计划..." rows="2"></textarea>
                         <button onclick="addPlan('today')">添加</button>
                     </div>
                 </div>
@@ -34,7 +35,7 @@
                     <h2>明日计划</h2>
                     <div id="tomorrow-plans"></div>
                     <div class="plan-input">
-                        <textarea id="tomorrow-input" placeholder="输入明日计划..." rows="3"></textarea>
+                        <textarea id="tomorrow-input" placeholder="输入明日计划..." rows="2"></textarea>
                         <button onclick="addPlan('tomorrow')">添加</button>
                     </div>
                 </div>
@@ -47,22 +48,36 @@
                 <label>今日盈亏（可选）</label>
                 <input type="number" id="pnl-input" step="0.01" placeholder="正数为盈利，负数为亏损">
                 <label>交易倾诉</label>
-                <textarea id="emotion-input" rows="6" placeholder="今天交易中发生了什么？你的感受是什么？有没有违背计划的地方？"></textarea>
+                <textarea id="emotion-input" rows="5" placeholder="今天交易中发生了什么？你的感受是什么？有没有违背计划的地方？"></textarea>
                 <button id="submit-review" onclick="submitReview()">提交复盘 — 接受拷打</button>
             </div>
             <div id="critique-result" class="critique-box" style="display:none"></div>
-            <h3>历史复盘</h3>
+            <div class="section-header" style="margin-top:2rem">
+                <h3>历史复盘</h3>
+                <button class="secondary" onclick="exportReviews()" style="margin:0;padding:0.3rem 0.8rem;font-size:0.8rem">导出 JSON</button>
+            </div>
             <div id="review-history"></div>
+            <div id="review-pagination" style="margin-top:1rem;text-align:center"></div>
         </section>
 
         <!-- Matrix Tab -->
         <section id="tab-matrix" class="tab-content">
-            <h2>弱点矩阵</h2>
+            <div class="section-header">
+                <h2>弱点矩阵</h2>
+                <button class="secondary" onclick="exportMatrix()" style="margin:0;padding:0.3rem 0.8rem;font-size:0.8rem">导出 JSON</button>
+            </div>
             <p class="hint">权重越高，说明该弱点近期越活跃。系统每日自动衰减未触发的弱点。</p>
+            <div id="matrix-chart"></div>
             <table id="matrix-table">
                 <thead><tr><th>弱点</th><th>权重</th><th>触发次数</th><th>最近触发</th><th>操作</th></tr></thead>
                 <tbody></tbody>
             </table>
+        </section>
+
+        <!-- Stats Tab -->
+        <section id="tab-stats" class="tab-content">
+            <h2 style="margin-bottom:1rem">统计面板</h2>
+            <div id="stats-content"></div>
         </section>
 
         <!-- Settings Tab -->
@@ -70,11 +85,11 @@
             <div class="settings-section">
                 <h2>LLM 配置</h2>
                 <label>Base URL</label>
-                <input type="text" id="cfg-base-url" placeholder="https://token-plan-cn.xiaomimimo.com/v1">
+                <input type="text" id="cfg-base-url" placeholder="https://api.openai.com/v1">
                 <label>API Key</label>
                 <input type="password" id="cfg-api-key" placeholder="sk-...">
                 <label>Model Name</label>
-                <input type="text" id="cfg-model-name" placeholder="模型名称">
+                <input type="text" id="cfg-model-name" placeholder="gpt-4o-mini">
                 <div class="btn-row">
                     <button onclick="saveLLM()">保存</button>
                     <button onclick="testLLM()" class="secondary">测试连接</button>
