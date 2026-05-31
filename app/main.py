@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down")
 
 
-app = FastAPI(title="Trading Mind Care", version="6.0.0", lifespan=lifespan)
+app = FastAPI(title="Trading Mind Care", version="7.0.0", lifespan=lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -124,4 +124,4 @@ async def version():
         clean = row["value"] == "1" if row else True
     finally:
         await db.close()
-    return {"version": "6.0.0", "name": "Trading Mind Care", "features": 85, "last_shutdown_clean": clean}
+    return {"version": "7.0.0", "name": "Trading Mind Care", "features": 95, "last_shutdown_clean": clean}
