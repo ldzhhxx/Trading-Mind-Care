@@ -446,6 +446,7 @@ async function loadStats() {
                 <div class="stat-card"><div class="value">${data.profit_factor}</div><div class="label">盈亏比</div></div>
                 <div class="stat-card"><div class="value positive">+${data.avg_win}</div><div class="label">平均盈利</div></div>
                 <div class="stat-card"><div class="value negative">${data.avg_loss}</div><div class="label">平均亏损</div></div>
+                <div class="stat-card"><div class="value">${data.plan_rate}%</div><div class="label">计划执行率</div></div>
             </div>`;
 
         // PnL trend bar chart

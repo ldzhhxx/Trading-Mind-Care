@@ -80,6 +80,13 @@ async def get_stats():
         cursor = await db.execute("SELECT COALESCE(AVG(pnl),0) as a FROM reviews WHERE pnl < 0")
         avg_loss = (await cursor.fetchone())["a"]
 
+        # Plan execution rate
+        cursor = await db.execute("SELECT COUNT(*) as total, SUM(done) as completed FROM plans WHERE plan_type='today'")
+        pr = await cursor.fetchone()
+        plan_total = pr["total"]
+        plan_done = pr["completed"] or 0
+        plan_rate = (plan_done / plan_total * 100) if plan_total > 0 else 0
+
         # Top weaknesses
         cursor = await db.execute(
             "SELECT tag, weight, hit_count FROM vulnerability_matrix ORDER BY hit_count DESC LIMIT 5"
@@ -105,6 +112,7 @@ async def get_stats():
             "profit_factor": round(profit_factor, 2),
             "avg_win": round(float(avg_win), 1),
             "avg_loss": round(float(avg_loss), 1),
+            "plan_rate": round(plan_rate, 1),
             "top_weaknesses": top_weaknesses,
             "pnl_trend": pnl_trend,
         }
