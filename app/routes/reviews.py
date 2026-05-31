@@ -125,6 +125,74 @@ async def delete_review(review_id: int):
         await db.close()
 
 
+@router.post("/{review_id}/recritique")
+async def recritique_review(review_id: int):
+    """Re-run AI critique on an existing review with streaming."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM reviews WHERE id = ?", (review_id,))
+        review = await cursor.fetchone()
+        if not review:
+            raise HTTPException(status_code=404, detail="复盘不存在")
+
+        trade_date = review["trade_date"]
+        cursor = await db.execute("SELECT content FROM plans WHERE trade_date = ?", (trade_date,))
+        plan_rows = await cursor.fetchall()
+        plans_text = "\n".join(f"- {row['content']}" for row in plan_rows) if plan_rows else "（当日无计划）"
+
+        cursor = await db.execute("SELECT rule, category FROM trade_rules WHERE active = 1")
+        rule_rows = await cursor.fetchall()
+        rules_text = "\n".join(f"- [{row['category']}] {row['rule']}" for row in rule_rows) if rule_rows else ""
+
+        cursor = await db.execute("SELECT value FROM sys_config WHERE key = 'critique_intensity'")
+        irow = await cursor.fetchone()
+        intensity = irow["value"] if irow else "3"
+    finally:
+        await db.close()
+
+    pnl_text = f"盈亏: {review['pnl']}" if review["pnl"] is not None else "盈亏: 未填写"
+    user_msg = f"""【当日计划】
+{plans_text}
+
+{"【交易纪律规则】" + chr(10) + rules_text if rules_text else ""}
+
+【实际结果】
+{pnl_text}
+
+【交易员倾诉】
+{review['emotion_log']}"""
+
+    system_prompt = CRITIQUE_SYSTEM_PROMPT + INTENSITY_MODIFIERS.get(intensity, "")
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async def stream():
+        full = ""
+        try:
+            async for chunk in call_llm_stream(messages):
+                full += chunk
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        # Update the review with new critique
+        db2 = await get_db()
+        try:
+            await db2.execute("UPDATE reviews SET ai_critique = ? WHERE id = ?", (full, review_id))
+            await db2.commit()
+        finally:
+            await db2.close()
+
+        yield f"data: {json.dumps({'done': True})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 @router.post("")
 async def create_review(review: ReviewCreate):
     trade_date = review.trade_date or date.today().isoformat()

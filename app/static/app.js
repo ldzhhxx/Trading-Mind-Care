@@ -429,7 +429,10 @@ async function toggleReviewDetail(el, id) {
             const moods = ['', '😫', '😟', '😐', '🙂', '😄'];
             html += `<div class="detail-section"><strong>情绪：</strong> ${moods[r.mood]} (${r.mood}/5)</div>`;
         }
-        html += `<div style="margin-top:0.5rem"><button class="secondary" onclick="deleteReview(${id})" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem;color:var(--danger)">🗑️ 删除此复盘</button></div>`;
+        html += `<div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+            <button class="secondary" onclick="event.stopPropagation();recritiqueReview(${id}, this)" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem">🔄 重新拷打</button>
+            <button class="secondary" onclick="event.stopPropagation();deleteReview(${id})" style="margin:0;padding:0.2rem 0.6rem;font-size:0.8rem;color:var(--danger)">🗑️ 删除</button>
+        </div>`;
         detail.innerHTML = html;
         detail.dataset.loaded = '1';
     } catch (e) { detail.innerHTML = '<em>加载失败</em>'; }
@@ -450,6 +453,46 @@ async function deleteReview(id) {
         toast('已删除');
         loadReviews();
     } catch (e) { toast(e.message, 'error'); }
+}
+
+async function recritiqueReview(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    const detail = document.getElementById(`review-detail-${id}`);
+    const critiqueEl = detail.querySelector('.detail-section:last-of-type p') || detail;
+    const origHtml = critiqueEl.innerHTML;
+    critiqueEl.innerHTML = '<em>AI 重新分析中...</em>';
+
+    try {
+        const res = await fetch(`/api/reviews/${id}/recritique`, { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let result = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+                try {
+                    const payload = JSON.parse(line.slice(6));
+                    if (payload.chunk) result += payload.chunk;
+                    if (payload.error) result = '错误: ' + payload.error;
+                } catch(e) {}
+            }
+        }
+        critiqueEl.textContent = result || origHtml;
+        detail.dataset.loaded = '';  // Force reload next time
+        toast('重新拷打完成');
+    } catch (e) {
+        critiqueEl.innerHTML = origHtml;
+        toast('重新拷打失败: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = '🔄 重新拷打';
 }
 
 // --- Matrix ---
