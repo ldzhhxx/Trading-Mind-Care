@@ -306,6 +306,12 @@ let reviewPage = 0;
 const PAGE_SIZE = 10;
 let selectedMood = null;
 
+function toggleFocusMode() {
+    document.body.classList.toggle('focus-mode');
+    const btn = document.getElementById('focus-btn');
+    btn.textContent = document.body.classList.contains('focus-mode') ? '↩️ 退出专注' : '🎯 专注模式';
+}
+
 function selectMood(val) {
     selectedMood = val;
     document.querySelectorAll('.mood-btn').forEach(b => {
