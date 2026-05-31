@@ -1121,3 +1121,130 @@ async def ai_premarket_reminder():
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.get("/context-analysis")
+async def context_tag_analysis():
+    """按交易情境标签分析表现."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT context_tags, pnl, mood FROM reviews WHERE context_tags != '' AND pnl IS NOT NULL"
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if not rows:
+        return {"tags": [], "message": "暂无情境标签数据"}
+
+    from collections import defaultdict
+    tag_stats = defaultdict(lambda: {"pnls": [], "moods": []})
+
+    for r in rows:
+        for tag in r["context_tags"].split(","):
+            tag = tag.strip()
+            if tag:
+                tag_stats[tag]["pnls"].append(r["pnl"])
+                if r["mood"]:
+                    tag_stats[tag]["moods"].append(r["mood"])
+
+    result = []
+    for tag, data in sorted(tag_stats.items(), key=lambda x: -len(x[1]["pnls"])):
+        pnls = data["pnls"]
+        moods = data["moods"]
+        wins = sum(1 for p in pnls if p > 0)
+        result.append({
+            "tag": tag,
+            "count": len(pnls),
+            "total_pnl": round(sum(pnls), 1),
+            "avg_pnl": round(sum(pnls) / len(pnls), 1),
+            "win_rate": round(wins / len(pnls) * 100, 1),
+            "avg_mood": round(sum(moods) / len(moods), 1) if moods else None,
+        })
+
+    return {"tags": result}
+
+
+@router.post("/ai-progress-report")
+async def ai_progress_report():
+    """AI 周度进步报告 — 对比本周与历史的改善."""
+    today = date.today()
+    week_start = (today - timedelta(days=today.weekday())).isoformat()
+    month_ago = (today - timedelta(days=30)).isoformat()
+
+    db = await get_db()
+    try:
+        # This week data
+        cursor = await db.execute(
+            "SELECT pnl, mood, trade_date FROM reviews WHERE trade_date >= ? AND pnl IS NOT NULL",
+            (week_start,),
+        )
+        this_week = [dict(r) for r in await cursor.fetchall()]
+
+        # Last month data for comparison
+        cursor = await db.execute(
+            "SELECT pnl, mood FROM reviews WHERE trade_date >= ? AND trade_date < ? AND pnl IS NOT NULL",
+            (month_ago, week_start),
+        )
+        last_month = [dict(r) for r in await cursor.fetchall()]
+
+        # Violations this week vs last month avg
+        cursor = await db.execute(
+            "SELECT COUNT(*) as cnt FROM discipline_violations WHERE trade_date >= ?", (week_start,)
+        )
+        week_violations = (await cursor.fetchone())["cnt"]
+
+        cursor = await db.execute(
+            "SELECT COUNT(*) as cnt FROM discipline_violations WHERE trade_date >= ? AND trade_date < ?",
+            (month_ago, week_start),
+        )
+        month_violations = (await cursor.fetchone())["cnt"]
+
+        # XP earned this week
+        cursor = await db.execute(
+            "SELECT SUM(xp) as xp FROM trader_xp WHERE trade_date >= ?", (week_start,)
+        )
+        week_xp = (await cursor.fetchone())["xp"] or 0
+
+        # Plan execution rate
+        cursor = await db.execute(
+            "SELECT COUNT(*) as total, SUM(done) as done FROM plans WHERE trade_date >= ? AND plan_type='today'",
+            (week_start,),
+        )
+        pr = await cursor.fetchone()
+        week_plan_rate = ((pr["done"] or 0) / pr["total"] * 100) if pr["total"] else 0
+    finally:
+        await db.close()
+
+    week_pnl = sum(r["pnl"] for r in this_week)
+    month_avg_pnl = sum(r["pnl"] for r in last_month) / max(1, len(last_month)) * len(this_week) if last_month else 0
+    week_moods = [r["mood"] for r in this_week if r.get("mood")]
+    month_moods = [r["mood"] for r in last_month if r.get("mood")]
+
+    user_msg = f"""【本周数据】
+- 交易{len(this_week)}天，总盈亏{week_pnl:.1f}
+- 平均情绪{sum(week_moods)/len(week_moods):.1f}/5 (上月{sum(month_moods)/len(month_moods):.1f}/5)
+- 纪律违反{week_violations}次 (上月周均{month_violations/4:.1f}次)
+- 计划执行率{week_plan_rate:.0f}%
+- 获得{week_xp} XP
+
+【上月同期对比】
+- 上月{len(last_month)}天交易，周均盈亏{month_avg_pnl:.1f}
+
+请生成本周进步报告：1.哪些方面有进步 2.哪些方面退步了 3.下周重点改善方向 4.一句话总结。200字以内。"""
+
+    messages = [
+        {"role": "system", "content": "你是交易心理教练，擅长生成鼓励性但诚实的进步报告。用数据说话，指出具体进步和不足。"},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async def stream():
+        try:
+            async for chunk in call_llm_stream(messages):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")

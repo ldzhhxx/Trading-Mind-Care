@@ -1688,6 +1688,20 @@ async function loadAnalytics(type) {
             } else {
                 html += `<p style="color:var(--text-dim)">暂无衰减历史数据（需要至少一天的数据积累）</p>`;
             }
+        } else if (type === 'context') {
+            data = await api('/api/analytics/context-analysis');
+            html = `<h3>🏷️ 交易情境分析</h3>`;
+            if (data.tags && data.tags.length) {
+                html += `<p class="hint" style="margin-bottom:1rem">按交易情境标签分析你在不同场景下的表现</p>`;
+                html += `<table style="width:100%;font-size:0.85rem"><thead><tr><th>情境</th><th>次数</th><th>总盈亏</th><th>平均盈亏</th><th>胜率</th><th>情绪</th></tr></thead><tbody>`;
+                for (const t of data.tags) {
+                    const pnlClass = t.avg_pnl >= 0 ? 'positive' : 'negative';
+                    html += `<tr><td><strong>${t.tag}</strong></td><td>${t.count}</td><td class="${pnlClass}">${t.total_pnl >= 0 ? '+' : ''}${t.total_pnl}</td><td class="${pnlClass}">${t.avg_pnl >= 0 ? '+' : ''}${t.avg_pnl}</td><td>${t.win_rate}%</td><td>${t.avg_mood ? t.avg_mood + '/5' : '-'}</td></tr>`;
+                }
+                html += `</tbody></table>`;
+            } else {
+                html += `<p style="color:var(--text-dim)">${data.message || '暂无情境标签数据，请在复盘时选择情境标签'}</p>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
@@ -1703,6 +1717,7 @@ async function aiAnalytics(type) {
         'weakness-deep': '/api/analytics/ai-weakness-deep',
         'behavior': '/api/analytics/ai-behavior-patterns',
         'premarket': '/api/analytics/ai-premarket',
+        'progress': '/api/analytics/ai-progress-report',
     };
     try {
         const res = await fetch(endpoints[type], { method: 'POST' });
