@@ -387,9 +387,109 @@ async def _plan_rate_for_dates(db, dates: list[str]) -> float:
     return (row["completed"] or 0) / row["total"] * 100
 
 
+@router.post("/ai-behavior-patterns")
+async def ai_behavior_patterns():
+    """AI 识别用户的行为模式（如每周一容易冲动、连赢后加仓等）."""
+    from collections import defaultdict
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT trade_date, pnl, mood, emotion_log FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date DESC LIMIT 60"
+        )
+        reviews = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute(
+            "SELECT tag, weight, hit_count FROM vulnerability_matrix WHERE hit_count > 0 ORDER BY weight DESC LIMIT 10"
+        )
+        vulns = [dict(r) for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if len(reviews) < 5:
+        async def empty():
+            yield f"data: {json.dumps({'chunk': '数据不足（至少需要5次复盘），请继续积累。'})}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(empty(), media_type="text/event-stream")
+
+    weekday_data = defaultdict(list)
+    for r in reviews:
+        dow = date.fromisoformat(r["trade_date"]).strftime("%A")
+        weekday_data[dow].append(r["pnl"])
+    weekday_summary = ", ".join(f"{d}: {len(v)}笔 avg={sum(v)/len(v):.1f}" for d, v in weekday_data.items())
+
+    user_msg = f"""【近60次交易】共{len(reviews)}笔
+【星期分布】{weekday_summary}
+【弱点TOP10】{', '.join(f"{v['tag']}({v['hit_count']}次)" for v in vulns)}
+【近期情绪】{'; '.join(r['emotion_log'][:60] for r in reviews[:5])}
+
+请分析行为模式：1.哪些日子容易犯错 2.连赢/连亏后行为变化 3.情绪与决策关联 4.给出3-5个具体模式+改善建议。300字以内。"""
+
+    messages = [
+        {"role": "system", "content": "你是交易行为分析专家，擅长从数据中识别行为模式。分析要具体、数据驱动。"},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async def stream():
+        try:
+            async for chunk in call_llm_stream(messages):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.get("/trading-style")
+async def trading_style_analysis():
+    """交易风格分析：激进 vs 保守."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT pnl FROM reviews WHERE pnl IS NOT NULL ORDER BY trade_date"
+        )
+        pnls = [r["pnl"] for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    if not pnls:
+        return {"style": "unknown", "metrics": {}}
+
+    abs_pnls = [abs(p) for p in pnls]
+    avg_abs = sum(abs_pnls) / len(abs_pnls)
+    max_win = max(pnls)
+    max_loss = min(pnls)
+    mean_pnl = sum(pnls) / len(pnls)
+    volatility = (sum((p - mean_pnl)**2 for p in pnls) / len(pnls)) ** 0.5 if len(pnls) > 1 else 0
+
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+    avg_win = sum(wins) / len(wins) if wins else 0
+    avg_loss = abs(sum(losses) / len(losses)) if losses else 0
+    risk_reward = avg_win / avg_loss if avg_loss > 0 else 0
+
+    aggression_score = min(100, int((volatility / (avg_abs + 1)) * 50 + (abs(max_loss) / (avg_abs + 1)) * 20))
+    style = "激进型" if aggression_score > 70 else "均衡型" if aggression_score > 40 else "保守型"
+
+    return {
+        "style": style,
+        "aggression_score": aggression_score,
+        "metrics": {
+            "avg_abs_pnl": round(avg_abs, 1),
+            "max_win": round(max_win, 1),
+            "max_loss": round(max_loss, 1),
+            "volatility": round(volatility, 1),
+            "risk_reward": round(risk_reward, 2),
+            "win_count": len(wins),
+            "loss_count": len(losses),
+            "total_trades": len(pnls),
+        },
+    }
+
+
 @router.post("/ai-generate-rules")
 async def ai_generate_rules():
     """AI 生成个性化的交易纪律清单."""
+
     db = await get_db()
     try:
         cursor = await db.execute(

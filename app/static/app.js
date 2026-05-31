@@ -1289,6 +1289,29 @@ async function loadAnalytics(type) {
             } else {
                 html += '<p style="color:var(--text-dim)">暂无弱点数据</p>';
             }
+        } else if (type === 'style') {
+            data = await api('/api/analytics/trading-style');
+            if (data.style === 'unknown') { html = '<p style="color:var(--text-dim)">暂无交易数据</p>'; }
+            else {
+                const m = data.metrics;
+                const scoreColor = data.aggression_score > 70 ? 'var(--danger)' : data.aggression_score > 40 ? 'var(--warning)' : 'var(--success)';
+                html = `<h3>交易风格分析</h3>
+                <div style="text-align:center;margin:1.5rem 0">
+                    <div style="font-size:2rem;font-weight:700;color:${scoreColor}">${data.style}</div>
+                    <div style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)">激进指数: ${data.aggression_score}/100</div>
+                    <div style="margin-top:0.5rem;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+                        <div style="height:100%;width:${data.aggression_score}%;background:${scoreColor};border-radius:4px"></div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="value">${m.total_trades}</div><div class="label">总交易次数</div></div>
+                    <div class="stat-card"><div class="value positive">+${m.max_win}</div><div class="label">最大盈利</div></div>
+                    <div class="stat-card"><div class="value negative">${m.max_loss}</div><div class="label">最大亏损</div></div>
+                    <div class="stat-card"><div class="value">${m.volatility}</div><div class="label">波动率</div></div>
+                    <div class="stat-card"><div class="value">${m.risk_reward}</div><div class="label">盈亏比</div></div>
+                    <div class="stat-card"><div class="value">${m.avg_abs_pnl}</div><div class="label">平均绝对盈亏</div></div>
+                </div>`;
+            }
         }
         el.innerHTML = html;
     } catch (e) { el.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`; }
@@ -1302,6 +1325,7 @@ async function aiAnalytics(type) {
         'week-compare': '/api/analytics/ai-week-compare',
         'danger': '/api/analytics/ai-danger-signals',
         'weakness-deep': '/api/analytics/ai-weakness-deep',
+        'behavior': '/api/analytics/ai-behavior-patterns',
     };
     try {
         const res = await fetch(endpoints[type], { method: 'POST' });
