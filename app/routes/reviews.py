@@ -1,0 +1,159 @@
+"""Reviews (post-trade critique) routes."""
+import json
+import math
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, field_validator
+from datetime import date
+from app.database import get_db
+from app.llm import call_llm
+
+router = APIRouter(prefix="/api/reviews", tags=["reviews"])
+
+CRITIQUE_SYSTEM_PROMPT = """你是一个极端理性的交易心理教练。你的风格：
+- 尖锐、直击要害，把交易员的行为和后果钉在一起让人无法逃避
+- 用数据和逻辑说话，不用空洞的鼓励
+- 如果交易员违背了自己的计划，你要精确指出哪条计划被违背了，以及这种行为模式的长期代价
+- 如果交易员执行了计划但亏损，你要肯定纪律性，分析是否是概率正常波动
+- 不使用侮辱性/攻击性词汇，但可以用反问、类比让人无处可逃
+- 回复控制在 300 字以内，每一句都要有信息量"""
+
+EXTRACT_WEAKNESS_PROMPT = """分析以下交易复盘对话，提取交易员暴露的心理弱点。
+返回严格的 JSON 数组，每个元素包含：
+- tag: 弱点标签（简短，如"报复性下单"、"扛单不止损"、"盈利后膨胀"）
+- severity: 严重程度 0.1-1.0
+
+只返回 JSON 数组，不要其他文字。如果没有明显弱点，返回空数组 []。"""
+
+
+class ReviewCreate(BaseModel):
+    trade_date: str | None = None
+    pnl: float | None = None
+    emotion_log: str
+
+    @field_validator("emotion_log")
+    @classmethod
+    def emotion_length(cls, v):
+        if len(v) > 5000:
+            raise ValueError("内容不能超过 5000 字符")
+        if not v.strip():
+            raise ValueError("内容不能为空")
+        return v.strip()
+
+    @field_validator("pnl")
+    @classmethod
+    def pnl_valid(cls, v):
+        if v is not None and (math.isnan(v) or math.isinf(v)):
+            raise ValueError("盈亏必须为有限数字")
+        return v
+
+
+@router.get("")
+async def list_reviews(trade_date: str | None = None, limit: int = 20):
+    db = await get_db()
+    try:
+        if trade_date:
+            cursor = await db.execute(
+                "SELECT * FROM reviews WHERE trade_date = ? ORDER BY created_at DESC", (trade_date,)
+            )
+        else:
+            cursor = await db.execute(
+                "SELECT * FROM reviews ORDER BY created_at DESC LIMIT ?", (limit,)
+            )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+@router.post("")
+async def create_review(review: ReviewCreate):
+    trade_date = review.trade_date or date.today().isoformat()
+
+    # Fetch today's plans for context
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT content FROM plans WHERE trade_date = ?", (trade_date,)
+        )
+        plan_rows = await cursor.fetchall()
+        plans_text = "\n".join(f"- {row['content']}" for row in plan_rows) if plan_rows else "（今日无计划）"
+
+        # Build LLM messages
+        pnl_text = f"盈亏: {review.pnl}" if review.pnl is not None else "盈亏: 未填写"
+        user_msg = f"""【今日计划】
+{plans_text}
+
+【实际结果】
+{pnl_text}
+
+【交易员倾诉】
+{review.emotion_log}"""
+
+        messages = [
+            {"role": "system", "content": CRITIQUE_SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg},
+        ]
+
+        # Try LLM call, graceful degradation
+        ai_critique = None
+        try:
+            ai_critique = await call_llm(messages)
+        except Exception:
+            ai_critique = None
+
+        # Save review
+        cursor = await db.execute(
+            "INSERT INTO reviews (trade_date, pnl, emotion_log, ai_critique) VALUES (?, ?, ?, ?)",
+            (trade_date, review.pnl, review.emotion_log, ai_critique),
+        )
+        review_id = cursor.lastrowid
+        await db.commit()
+
+        # Async weakness extraction (best effort)
+        if ai_critique:
+            try:
+                await _extract_weaknesses(db, review.emotion_log, ai_critique)
+            except Exception:
+                pass
+
+        return {
+            "id": review_id,
+            "ai_critique": ai_critique,
+            "ai_available": ai_critique is not None,
+        }
+    finally:
+        await db.close()
+
+
+async def _extract_weaknesses(db, emotion_log: str, critique: str):
+    """Extract weaknesses from review and update matrix."""
+    messages = [
+        {"role": "system", "content": EXTRACT_WEAKNESS_PROMPT},
+        {"role": "user", "content": f"交易员倾诉：{emotion_log}\n\n教练点评：{critique}"},
+    ]
+    raw = await call_llm(messages)
+
+    # Parse JSON from response
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
+
+    weaknesses = json.loads(raw)
+    if not isinstance(weaknesses, list):
+        return
+
+    now = date.today().isoformat()
+    for w in weaknesses:
+        tag = w.get("tag", "").strip()
+        severity = min(max(float(w.get("severity", 0.5)), 0.1), 1.0)
+        if not tag:
+            continue
+        await db.execute("""
+            INSERT INTO vulnerability_matrix (tag, weight, hit_count, last_hit_at, description)
+            VALUES (?, ?, 1, ?, ?)
+            ON CONFLICT(tag) DO UPDATE SET
+                weight = weight + ? * 0.5,
+                hit_count = hit_count + 1,
+                last_hit_at = ?
+        """, (tag, severity, now, tag, severity, now))
+    await db.commit()
