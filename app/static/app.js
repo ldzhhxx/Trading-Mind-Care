@@ -425,6 +425,8 @@ async function submitReview() {
         document.getElementById('emotion-input').value = '';
         document.getElementById('pnl-input').value = '';
         selectedMood = null;
+        selectedContextTags.clear();
+        document.querySelectorAll('.context-tag-btn').forEach(b => { b.style.background = ''; b.style.color = ''; });
         document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
         localStorage.removeItem('review_draft');
         loadReviews();
@@ -433,7 +435,7 @@ async function submitReview() {
         try {
             const ruleCheck = await api('/api/reviews/check-rules', {
                 method: 'POST',
-                body: JSON.stringify({ emotion_log: emotion, pnl })
+                body: JSON.stringify({ emotion_log: emotion, pnl, trade_date })
             });
             if (ruleCheck.violations && ruleCheck.violations.length) {
                 box.textContent += '\n\n⚠️ 纪律违反检测：\n';
