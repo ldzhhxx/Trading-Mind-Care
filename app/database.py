@@ -214,6 +214,41 @@ async def _run_migrations(db):
             recorded_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
         )"""),
         (24, "CREATE INDEX IF NOT EXISTS idx_vuln_history_tag ON vuln_weight_history(tag)"),
+        # Migration 25-30: Market data module (v10.0)
+        (25, """CREATE TABLE IF NOT EXISTS trades (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            trade_date  TEXT NOT NULL,
+            stock_code  TEXT NOT NULL,
+            stock_name  TEXT,
+            direction   TEXT NOT NULL CHECK(direction IN ('buy', 'sell')),
+            price       REAL NOT NULL,
+            quantity    INTEGER NOT NULL,
+            amount      REAL,
+            commission  REAL DEFAULT 0,
+            note        TEXT DEFAULT '',
+            review_id   INTEGER,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (review_id) REFERENCES reviews(id)
+        )"""),
+        (26, "CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(trade_date)"),
+        (27, "CREATE INDEX IF NOT EXISTS idx_trades_code ON trades(stock_code)"),
+        (28, "CREATE INDEX IF NOT EXISTS idx_trades_review ON trades(review_id)"),
+        (29, """CREATE TABLE IF NOT EXISTS market_cache (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            stock_code  TEXT NOT NULL,
+            data_date   TEXT NOT NULL,
+            data_type   TEXT NOT NULL,
+            data_json   TEXT NOT NULL,
+            source      TEXT NOT NULL,
+            fetched_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            UNIQUE(stock_code, data_date, data_type)
+        )"""),
+        (30, "CREATE INDEX IF NOT EXISTS idx_cache_code_date ON market_cache(stock_code, data_date)"),
+        (31, """CREATE TABLE IF NOT EXISTS stock_list (
+            code        TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )"""),
     ]
 
     for version, sql in migrations:

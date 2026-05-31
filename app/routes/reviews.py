@@ -8,6 +8,7 @@ from datetime import date
 from app.database import get_db
 from app.llm import call_llm, call_llm_stream
 from app.feishu import send_review_notification, send_big_pnl_alert, send_milestone_notification
+from app.market_data.service import get_trade_context, format_context_for_ai
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -282,6 +283,30 @@ async def create_review_stream(review: ReviewCreate):
 
     pnl_text = f"盈亏: {review.pnl}" if review.pnl is not None else "盈亏: 未填写"
     mood_text = f"情绪评分: {review.mood}/5" if review.mood else "情绪评分: 未填写"
+
+    # Fetch market context for today's trades (best-effort, non-blocking)
+    market_context_text = ""
+    try:
+        db_mc = await get_db()
+        try:
+            cur_mc = await db_mc.execute(
+                "SELECT * FROM trades WHERE trade_date=?", (trade_date,)
+            )
+            day_trades = [dict(r) for r in await cur_mc.fetchall()]
+        finally:
+            await db_mc.close()
+        if day_trades:
+            import asyncio
+            ctx_results = await asyncio.gather(
+                *[get_trade_context(t) for t in day_trades],
+                return_exceptions=True,
+            )
+            parts = [format_context_for_ai(c) for c in ctx_results if not isinstance(c, Exception) and format_context_for_ai(c)]
+            if parts:
+                market_context_text = "\n\n【行情数据】\n" + "\n---\n".join(parts)
+    except Exception:
+        pass
+
     user_msg = f"""【今日计划】
 {plans_text}
 
@@ -289,7 +314,7 @@ async def create_review_stream(review: ReviewCreate):
 
 【实际结果】
 {pnl_text}
-{mood_text}
+{mood_text}{market_context_text}
 
 【交易员倾诉】
 {review.emotion_log}"""
@@ -303,7 +328,10 @@ async def create_review_stream(review: ReviewCreate):
     finally:
         await db3.close()
 
-    system_prompt = CRITIQUE_SYSTEM_PROMPT + INTENSITY_MODIFIERS.get(intensity, "")
+    base_prompt = CRITIQUE_SYSTEM_PROMPT
+    if market_context_text:
+        base_prompt += "\n\n如果提供了【行情数据】，你必须基于真实数据分析：交易时机是否合理、滑点是否过大、是否跑赢大盘，并将这些数据与交易员的心理状态关联起来。"
+    system_prompt = base_prompt + INTENSITY_MODIFIERS.get(intensity, "")
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_msg},

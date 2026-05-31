@@ -27,6 +27,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
         const tab = btn.dataset.tab;
         if (tab === 'plans') loadPlans();
+        else if (tab === 'trades') { initTradesTab(); loadTrades(true); }
         else if (tab === 'review') { document.getElementById('review-date-input').value = new Date().toISOString().slice(0,10); loadReviews(); loadReviewTemplates(); }
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
@@ -2139,3 +2140,341 @@ async function journalWeeklyDigest() {
         }
     } catch (e) { box.textContent = `错误: ${e.message}`; }
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// TRADES MODULE
+// ═══════════════════════════════════════════════════════════════
+
+let _parsedTrade = null;  // holds last parse result
+
+function initTradesTab() {
+    const dateEl = document.getElementById('trade-date-input');
+    if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0, 10);
+    const filterDate = document.getElementById('trade-filter-date');
+    if (filterDate && !filterDate.value) filterDate.value = new Date().toISOString().slice(0, 10);
+}
+
+async function parseTrade() {
+    const text = document.getElementById('trade-quick-input').value.trim();
+    if (!text) return;
+    try {
+        const result = await api('/api/trades/parse', {
+            method: 'POST',
+            body: JSON.stringify({ text }),
+        });
+        _parsedTrade = result;
+        showTradePreview(result);
+    } catch (e) {
+        showToast('解析失败: ' + e.message, 'error');
+    }
+}
+
+function showTradePreview(r) {
+    const preview = document.getElementById('trade-preview');
+    const content = document.getElementById('trade-preview-content');
+    if (!r.code && r.errors && r.errors.length) {
+        content.innerHTML = `<div style="color:var(--danger)">${r.errors.join('<br>')}</div>`;
+        preview.style.display = 'block';
+        return;
+    }
+    const dirLabel = r.direction === 'buy' ? '<span style="color:#26a69a">买入</span>' : '<span style="color:#ef5350">卖出</span>';
+    const amount = r.price && r.quantity ? `= <strong>¥${(r.price * r.quantity).toLocaleString()}</strong>` : '';
+    const errors = r.errors && r.errors.length ? `<div style="color:var(--warning);font-size:0.8rem;margin-top:0.4rem">⚠️ ${r.errors.join(' | ')}</div>` : '';
+    content.innerHTML = `
+        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+            <div style="font-size:1.1rem;font-weight:600">${r.name || r.code || '?'} <span style="color:var(--text-dim);font-size:0.85rem">${r.code || ''}</span></div>
+            <div>${dirLabel}</div>
+            ${r.quantity ? `<div>${r.quantity.toLocaleString()} 股</div>` : ''}
+            ${r.price ? `<div>@ ¥${r.price}</div>` : ''}
+            <div style="color:var(--text-dim)">${amount}</div>
+        </div>
+        ${errors}`;
+    preview.style.display = 'block';
+}
+
+async function confirmTrade() {
+    if (!_parsedTrade || !_parsedTrade.code) {
+        showToast('请先解析交易记录', 'error');
+        return;
+    }
+    const r = _parsedTrade;
+    if (!r.direction) { showToast('无法识别买卖方向', 'error'); return; }
+    if (!r.price) { showToast('请补充成交价格', 'error'); return; }
+    if (!r.quantity) { showToast('请补充成交数量', 'error'); return; }
+
+    try {
+        await api('/api/trades', {
+            method: 'POST',
+            body: JSON.stringify({
+                stock_code: r.code,
+                stock_name: r.name || null,
+                direction: r.direction,
+                price: r.price,
+                quantity: r.quantity,
+            }),
+        });
+        document.getElementById('trade-preview').style.display = 'none';
+        document.getElementById('trade-quick-input').value = '';
+        _parsedTrade = null;
+        showToast('交易记录已保存 ✓');
+        loadTrades(true);
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function submitManualTrade() {
+    const code = document.getElementById('trade-code-input').value.trim();
+    const direction = document.getElementById('trade-direction-input').value;
+    const price = parseFloat(document.getElementById('trade-price-input').value);
+    const qty = parseInt(document.getElementById('trade-qty-input').value);
+    const note = document.getElementById('trade-note-input').value.trim();
+    const tradeDate = document.getElementById('trade-date-input').value;
+
+    if (!code) { showToast('请输入股票代码', 'error'); return; }
+    if (!price || price <= 0) { showToast('请输入有效价格', 'error'); return; }
+    if (!qty || qty <= 0) { showToast('请输入有效数量', 'error'); return; }
+
+    try {
+        await api('/api/trades', {
+            method: 'POST',
+            body: JSON.stringify({ trade_date: tradeDate || undefined, stock_code: code, direction, price, quantity: qty, note }),
+        });
+        showToast('交易记录已保存 ✓');
+        loadTrades(true);
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function loadTrades(all = false) {
+    const list = document.getElementById('trades-list');
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem">加载中...</div>';
+
+    const params = new URLSearchParams({ limit: 50 });
+    if (!all) {
+        const d = document.getElementById('trade-filter-date').value;
+        const c = document.getElementById('trade-filter-code').value.trim();
+        if (d) params.set('trade_date', d);
+        if (c) params.set('stock_code', c);
+    }
+
+    try {
+        const data = await api('/api/trades?' + params);
+        renderTradeList(data.items, list);
+    } catch (e) {
+        list.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`;
+    }
+}
+
+function renderTradeList(trades, container) {
+    if (!trades.length) {
+        container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:2rem;font-size:0.9rem">暂无交易记录<br><small>在上方输入框录入第一笔交易</small></div>';
+        return;
+    }
+    container.innerHTML = trades.map(t => {
+        const dirColor = t.direction === 'buy' ? '#26a69a' : '#ef5350';
+        const dirLabel = t.direction === 'buy' ? '买入' : '卖出';
+        const amount = t.amount ? `¥${t.amount.toLocaleString()}` : '';
+        return `
+        <div style="background:var(--surface);border:1px solid var(--surface2);border-radius:var(--radius);padding:0.8rem 1rem;margin-bottom:0.5rem;cursor:pointer;transition:border-color 0.2s" onclick="showTradeDetail(${t.id})" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--surface2)'">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem">
+                <div style="display:flex;gap:0.8rem;align-items:center">
+                    <span style="font-weight:600">${t.stock_name || t.stock_code}</span>
+                    <span style="color:var(--text-dim);font-size:0.8rem">${t.stock_code}</span>
+                    <span style="color:${dirColor};font-weight:600;font-size:0.85rem">${dirLabel}</span>
+                </div>
+                <div style="display:flex;gap:0.8rem;align-items:center;font-size:0.85rem">
+                    <span>¥${t.price} × ${t.quantity.toLocaleString()}股</span>
+                    <span style="color:var(--text-dim)">${amount}</span>
+                    <span style="color:var(--text-dim);font-size:0.75rem">${t.trade_date}</span>
+                </div>
+            </div>
+            ${t.note ? `<div style="font-size:0.75rem;color:var(--text-dim);margin-top:0.3rem">${t.note}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+async function showTradeDetail(tradeId) {
+    const modal = document.getElementById('trade-detail-modal');
+    const content = document.getElementById('trade-detail-content');
+    modal.style.display = 'block';
+    content.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:2rem">加载行情数据中...</div>';
+
+    try {
+        const [trade, ctx] = await Promise.all([
+            api(`/api/trades/${tradeId}`),
+            api(`/api/trades/${tradeId}/context`).catch(() => null),
+        ]);
+        content.innerHTML = renderTradeDetail(trade, ctx);
+    } catch (e) {
+        content.innerHTML = `<div style="color:var(--danger)">加载失败: ${e.message}</div>`;
+    }
+}
+
+function renderTradeDetail(t, ctx) {
+    const dirColor = t.direction === 'buy' ? '#26a69a' : '#ef5350';
+    const dirLabel = t.direction === 'buy' ? '买入' : '卖出';
+    const amount = t.amount ? `¥${t.amount.toLocaleString()}` : '';
+
+    let marketHtml = '';
+    if (ctx && !ctx.offline && ctx.today_bar) {
+        const bar = ctx.today_bar;
+        const changeColor = (bar.change_pct || 0) >= 0 ? '#26a69a' : '#ef5350';
+        const changeSign = (bar.change_pct || 0) >= 0 ? '+' : '';
+
+        // Timing score ring
+        const timing = ctx.timing;
+        const slippage = ctx.slippage;
+        const vsIndex = ctx.vs_index;
+
+        const timingColor = timing ? (timing.score >= 70 ? '#26a69a' : timing.score >= 40 ? '#ff9800' : '#ef5350') : '#888';
+
+        marketHtml = `
+        <div style="margin-top:1rem;border-top:1px solid var(--surface2);padding-top:1rem">
+            <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:0.6rem">📊 行情数据 · ${t.trade_date}</div>
+
+            <!-- OHLC bar -->
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:0.85rem;margin-bottom:0.8rem;background:var(--bg);padding:0.6rem 0.8rem;border-radius:var(--radius)">
+                <span>开 <strong>${bar.open}</strong></span>
+                <span>高 <strong style="color:#26a69a">${bar.high}</strong></span>
+                <span>低 <strong style="color:#ef5350">${bar.low}</strong></span>
+                <span>收 <strong>${bar.close}</strong></span>
+                <span style="color:${changeColor};font-weight:600">${changeSign}${(bar.change_pct||0).toFixed(2)}%</span>
+            </div>
+
+            <!-- Analysis cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.6rem">
+                ${timing ? `
+                <div style="background:var(--bg);border-radius:var(--radius);padding:0.7rem;text-align:center">
+                    <div style="font-size:1.6rem;font-weight:700;color:${timingColor}">${timing.score}</div>
+                    <div style="font-size:0.75rem;color:var(--text-dim)">时机评分</div>
+                    <div style="font-size:0.8rem;font-weight:600;color:${timingColor}">${timing.label}</div>
+                    <div style="font-size:0.7rem;color:var(--text-dim);margin-top:0.2rem">${timing.detail}</div>
+                </div>` : ''}
+                ${slippage ? `
+                <div style="background:var(--bg);border-radius:var(--radius);padding:0.7rem;text-align:center">
+                    <div style="font-size:1.2rem;font-weight:700;color:${Math.abs(slippage.slippage_pct) < 0.5 ? '#26a69a' : '#ef5350'}">${slippage.slippage_pct > 0 ? '+' : ''}${slippage.slippage_pct.toFixed(2)}%</div>
+                    <div style="font-size:0.75rem;color:var(--text-dim)">滑点</div>
+                    <div style="font-size:0.8rem;font-weight:600">${slippage.label}</div>
+                    <div style="font-size:0.7rem;color:var(--text-dim);margin-top:0.2rem">均价 ¥${slippage.vwap}</div>
+                </div>` : ''}
+                ${vsIndex ? `
+                <div style="background:var(--bg);border-radius:var(--radius);padding:0.7rem;text-align:center">
+                    <div style="font-size:1rem;font-weight:700;color:${vsIndex.alpha >= 0 ? '#26a69a' : '#ef5350'}">${vsIndex.alpha >= 0 ? '+' : ''}${vsIndex.alpha.toFixed(2)}%</div>
+                    <div style="font-size:0.75rem;color:var(--text-dim)">超额收益</div>
+                    <div style="font-size:0.8rem;font-weight:600">${vsIndex.label}</div>
+                    <div style="font-size:0.7rem;color:var(--text-dim);margin-top:0.2rem">${vsIndex.index_name} ${vsIndex.index_change >= 0 ? '+' : ''}${vsIndex.index_change.toFixed(2)}%</div>
+                </div>` : ''}
+            </div>
+
+            <!-- Mini kline (last 10 bars) -->
+            ${ctx.kline && ctx.kline.length > 1 ? renderMiniKline(ctx.kline.slice(-10), t.price, t.trade_date) : ''}
+        </div>`;
+    } else if (ctx && ctx.offline) {
+        marketHtml = `<div style="margin-top:0.8rem;font-size:0.8rem;color:var(--text-dim);background:var(--bg);padding:0.5rem 0.8rem;border-radius:var(--radius)">📡 行情数据不可用（网络离线或数据源暂时不可用）</div>`;
+    }
+
+    return `
+    <div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.8rem">
+            <div>
+                <div style="font-size:1.2rem;font-weight:700">${t.stock_name || t.stock_code} <span style="color:var(--text-dim);font-size:0.85rem;font-weight:400">${t.stock_code}</span></div>
+                <div style="margin-top:0.3rem;display:flex;gap:0.6rem;align-items:center">
+                    <span style="color:${dirColor};font-weight:600">${dirLabel}</span>
+                    <span style="font-size:0.9rem">¥${t.price} × ${t.quantity.toLocaleString()}股</span>
+                    <span style="color:var(--text-dim);font-size:0.85rem">${amount}</span>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-dim);margin-top:0.2rem">${t.trade_date}</div>
+            </div>
+            <button onclick="deleteTrade(${t.id})" class="secondary" style="margin:0;padding:0.3rem 0.6rem;font-size:0.75rem;color:var(--danger)">删除</button>
+        </div>
+        ${t.note ? `<div style="font-size:0.85rem;color:var(--text-dim);background:var(--bg);padding:0.4rem 0.6rem;border-radius:var(--radius)">${t.note}</div>` : ''}
+        ${marketHtml}
+    </div>`;
+}
+
+function renderMiniKline(bars, tradePrice, tradeDate) {
+    if (!bars.length) return '';
+    const highs = bars.map(b => b.high);
+    const lows = bars.map(b => b.low);
+    const maxH = Math.max(...highs);
+    const minL = Math.min(...lows);
+    const range = maxH - minL || 1;
+    const W = 280, H = 60, barW = Math.floor(W / bars.length) - 1;
+
+    const rects = bars.map((b, i) => {
+        const x = i * (barW + 1);
+        const isUp = b.close >= b.open;
+        const color = isUp ? '#26a69a' : '#ef5350';
+        const bodyTop = H - ((Math.max(b.open, b.close) - minL) / range) * H;
+        const bodyH = Math.max(1, ((Math.abs(b.close - b.open)) / range) * H);
+        const wickTop = H - ((b.high - minL) / range) * H;
+        const wickBot = H - ((b.low - minL) / range) * H;
+        const isToday = b.date === tradeDate;
+        return `
+            <line x1="${x + barW / 2}" y1="${wickTop}" x2="${x + barW / 2}" y2="${wickBot}" stroke="${color}" stroke-width="1"/>
+            <rect x="${x}" y="${bodyTop}" width="${barW}" height="${bodyH}" fill="${color}" opacity="${isToday ? 1 : 0.7}"/>
+            ${isToday ? `<rect x="${x}" y="0" width="${barW}" height="${H}" fill="${color}" opacity="0.1"/>` : ''}`;
+    }).join('');
+
+    // Trade price line
+    const priceY = H - ((tradePrice - minL) / range) * H;
+    const priceLine = (tradePrice >= minL && tradePrice <= maxH)
+        ? `<line x1="0" y1="${priceY}" x2="${W}" y2="${priceY}" stroke="#ff9800" stroke-width="1" stroke-dasharray="3,2"/>`
+        : '';
+
+    return `
+    <div style="margin-top:0.8rem">
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:0.3rem">近期K线（橙线=成交价）</div>
+        <svg width="${W}" height="${H}" style="display:block;overflow:visible">
+            ${rects}
+            ${priceLine}
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-dim);margin-top:0.2rem">
+            <span>${bars[0].date}</span><span>${bars[bars.length-1].date}</span>
+        </div>
+    </div>`;
+}
+
+async function deleteTrade(tradeId) {
+    if (!confirm('确认删除这条交易记录？')) return;
+    try {
+        await api(`/api/trades/${tradeId}`, { method: 'DELETE' });
+        document.getElementById('trade-detail-modal').style.display = 'none';
+        showToast('已删除');
+        loadTrades(true);
+    } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+    }
+}
+
+// Stock inline search
+let _searchTimer = null;
+async function searchStockInline(q) {
+    clearTimeout(_searchTimer);
+    const dd = document.getElementById('stock-search-dropdown');
+    if (!q || q.length < 2) { dd.style.display = 'none'; return; }
+    _searchTimer = setTimeout(async () => {
+        try {
+            const data = await api(`/api/market/search?q=${encodeURIComponent(q)}`);
+            if (!data.items.length) { dd.style.display = 'none'; return; }
+            dd.style.display = 'block';
+            dd.innerHTML = data.items.map(s =>
+                `<div style="padding:0.4rem 0.8rem;cursor:pointer;font-size:0.85rem" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''" onclick="selectStock('${s.code}','${s.name}')">${s.name} <span style="color:var(--text-dim)">${s.code}</span></div>`
+            ).join('');
+        } catch {}
+    }, 300);
+}
+
+function selectStock(code, name) {
+    document.getElementById('trade-code-input').value = code;
+    document.getElementById('stock-search-dropdown').style.display = 'none';
+}
+
+// Quick-input: press Enter to parse
+document.addEventListener('DOMContentLoaded', () => {
+    const qi = document.getElementById('trade-quick-input');
+    if (qi) qi.addEventListener('keydown', e => { if (e.key === 'Enter') parseTrade(); });
+});

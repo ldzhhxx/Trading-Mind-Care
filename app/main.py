@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.database import init_db, get_db
 from app.scheduler import start_scheduler, daily_decay
 from app.feishu import send_daily_notification
-from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal, monthly, analytics, goals, coach, report, review_templates, discipline
+from app.routes import plans, reviews, vulnerabilities, settings, notifications, stats, daily_report, data, calendar, weekly, rules, insights, journal, monthly, analytics, goals, coach, report, review_templates, discipline, trades, market
 
 # Configure logging
 logging.basicConfig(
@@ -104,6 +104,8 @@ app.include_router(coach.router)
 app.include_router(report.router)
 app.include_router(review_templates.router)
 app.include_router(discipline.router)
+app.include_router(trades.router)
+app.include_router(market.router)
 
 # Static files
 static_dir = get_static_dir()
