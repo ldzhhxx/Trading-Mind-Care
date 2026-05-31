@@ -140,3 +140,47 @@ async def data_health_check():
         }
     finally:
         await db.close()
+
+
+@router.get("/export/all")
+async def export_all():
+    """Export all data as a single JSON for complete backup."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM reviews ORDER BY trade_date DESC")
+        reviews = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT * FROM plans ORDER BY trade_date DESC")
+        plans = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT * FROM vulnerability_matrix ORDER BY weight DESC")
+        vulns = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT * FROM plan_templates")
+        templates = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT * FROM trade_rules")
+        rules = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT * FROM journal ORDER BY trade_date DESC")
+        journal = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT key, value FROM sys_config WHERE key NOT IN ('api_key')")
+        config = {r["key"]: r["value"] for r in await cursor.fetchall()}
+    finally:
+        await db.close()
+
+    from datetime import date as d
+    export = {
+        "export_date": d.today().isoformat(),
+        "version": "3.0",
+        "reviews": reviews,
+        "plans": plans,
+        "vulnerability_matrix": vulns,
+        "plan_templates": templates,
+        "trade_rules": rules,
+        "journal": journal,
+        "config": config,
+    }
+
+    output = io.StringIO()
+    output.write(json.dumps(export, ensure_ascii=False, indent=2))
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=trading_mind_care_full_backup.json"},
+    )
