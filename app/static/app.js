@@ -25,6 +25,7 @@ document.querySelectorAll('.tab').forEach(btn => {
         else if (tab === 'review') { document.getElementById('review-date-input').value = new Date().toISOString().slice(0,10); loadReviews(); }
         else if (tab === 'matrix') loadMatrix();
         else if (tab === 'stats') loadStats();
+        else if (tab === 'analytics') loadAnalytics('pnl');
         else if (tab === 'daily') loadDailyReport();
         else if (tab === 'calendar') loadCalendar();
         else if (tab === 'settings') loadSettings();
@@ -775,6 +776,34 @@ async function loadStats() {
         }
 
         el.innerHTML = html;
+
+        // Load additional trend data
+        try {
+            const [planTrend, moodTrend] = await Promise.all([
+                api('/api/plans/execution-trend'),
+                api('/api/reviews/mood-trend'),
+            ]);
+            let extraHtml = '';
+            if (planTrend.length) {
+                const maxRate = 100;
+                extraHtml += `<h3 style="margin:1.5rem 0 0.8rem">计划执行率趋势（近30天）</h3>
+                <div class="pnl-trend">${planTrend.map(d => {
+                    const h = Math.max(4, d.rate / maxRate * 40);
+                    const color = d.rate >= 80 ? 'var(--success)' : d.rate >= 50 ? 'var(--accent)' : 'var(--danger)';
+                    return `<div class="trend-bar-wrap" title="${d.date}: ${d.rate}% (${d.completed}/${d.total})"><div class="trend-bar" style="height:${h}px;background:${color};align-self:flex-end"></div><span class="trend-date">${d.date.slice(5)}</span></div>`;
+                }).join('')}</div>`;
+            }
+            if (moodTrend.length) {
+                const maxMood = 5;
+                extraHtml += `<h3 style="margin:1.5rem 0 0.8rem">情绪趋势（近30天）</h3>
+                <div class="pnl-trend">${moodTrend.map(d => {
+                    const h = Math.max(4, d.mood / maxMood * 40);
+                    const color = d.mood >= 4 ? 'var(--success)' : d.mood >= 3 ? 'var(--accent)' : 'var(--danger)';
+                    return `<div class="trend-bar-wrap" title="${d.date}: 情绪${d.mood}/5, 盈亏${d.pnl}"><div class="trend-bar" style="height:${h}px;background:${color};align-self:flex-end"></div><span class="trend-date">${d.date.slice(5)}</span></div>`;
+                }).join('')}</div>`;
+            }
+            if (extraHtml) el.innerHTML += extraHtml;
+        } catch(e) {}
     } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1339,3 +1368,21 @@ origTabHandler.forEach(btn => {
         if (btn.dataset.tab === 'analytics') loadAnalytics('pnl');
     });
 });
+
+// --- AI Generate Rules ---
+async function aiGenerateRules() {
+    try {
+        toast('AI 正在分析你的弱点生成规则...');
+        const res = await api('/api/analytics/ai-generate-rules', { method: 'POST' });
+        if (res.error) { toast('AI 暂不可用: ' + res.error, 'error'); return; }
+        if (!res.rules.length) { toast('AI 未生成新规则', 'error'); return; }
+        const msg = res.rules.map(r => `[${r.category}] ${r.rule}\n  原因: ${r.reason}`).join('\n\n');
+        if (confirm(`AI 建议以下规则：\n\n${msg}\n\n是否全部添加？`)) {
+            for (const r of res.rules) {
+                await api('/api/rules', { method: 'POST', body: JSON.stringify({ rule: r.rule, category: r.category }) });
+            }
+            loadRules();
+            toast(`已添加 ${res.rules.length} 条 AI 生成规则`);
+        }
+    } catch (e) { toast(e.message, 'error'); }
+}

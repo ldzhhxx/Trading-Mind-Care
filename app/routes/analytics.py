@@ -385,3 +385,44 @@ async def _plan_rate_for_dates(db, dates: list[str]) -> float:
     if row["total"] == 0:
         return 0
     return (row["completed"] or 0) / row["total"] * 100
+
+
+@router.post("/ai-generate-rules")
+async def ai_generate_rules():
+    """AI 生成个性化的交易纪律清单."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT tag, weight, hit_count FROM vulnerability_matrix WHERE weight >= 1.0 ORDER BY weight DESC LIMIT 10"
+        )
+        vulns = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute("SELECT rule, category FROM trade_rules WHERE active = 1")
+        existing_rules = [dict(r) for r in await cursor.fetchall()]
+        cursor = await db.execute(
+            "SELECT emotion_log FROM reviews ORDER BY created_at DESC LIMIT 5"
+        )
+        recent_emotions = [r["emotion_log"][:100] for r in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+    vulns_text = "\n".join(f"- {v['tag']} (权重{v['weight']:.1f}, 触发{v['hit_count']}次)" for v in vulns) or "暂无"
+    rules_text = "\n".join(f"- [{r['category']}] {r['rule']}" for r in existing_rules) or "暂无"
+    emotions_text = "\n".join(f"- {e}" for e in recent_emotions) or "暂无"
+
+    messages = [
+        {"role": "system", "content": """你是交易纪律制定专家。根据交易员的弱点和历史行为，生成个性化的交易纪律清单。
+返回严格JSON数组，每个元素：{"rule": "具体规则", "category": "风控/纪律/心态", "reason": "为什么需要这条规则"}
+规则要具体、可量化、可执行。不要泛泛而谈。5-8条即可。只返回JSON。"""},
+        {"role": "user", "content": f"【当前弱点】\n{vulns_text}\n\n【现有规则】\n{rules_text}\n\n【近期倾诉】\n{emotions_text}"},
+    ]
+
+    from app.llm import call_llm
+    try:
+        raw = await call_llm(messages)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0]
+        rules = json.loads(raw)
+        return {"rules": rules if isinstance(rules, list) else []}
+    except Exception as e:
+        return {"rules": [], "error": str(e)}
