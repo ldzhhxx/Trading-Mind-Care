@@ -96,6 +96,13 @@
         <section id="tab-stats" class="tab-content">
             <h2 style="margin-bottom:1rem">统计面板</h2>
             <div id="stats-content"></div>
+            <div style="margin-top:2rem;border-top:1px solid var(--surface2);padding-top:1.5rem">
+                <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+                    <h3>📝 AI 每周总结</h3>
+                    <button onclick="generateWeeklySummary()" id="weekly-btn" style="margin:0;padding:0.4rem 0.8rem;font-size:0.85rem">生成本周总结</button>
+                </div>
+                <div id="weekly-summary" class="critique-box" style="display:none"></div>
+            </div>
         </section>
 
         <!-- Daily Report Tab -->

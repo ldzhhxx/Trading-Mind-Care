@@ -610,6 +610,37 @@ document.querySelectorAll('.plan-input textarea').forEach(ta => {
     });
 });
 
+// --- Weekly Summary ---
+async function generateWeeklySummary() {
+    const btn = document.getElementById('weekly-btn');
+    const box = document.getElementById('weekly-summary');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    box.style.display = 'block';
+    box.innerHTML = '';
+    try {
+        const res = await fetch('/api/weekly/generate', { method: 'POST' });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+                const payload = JSON.parse(line.slice(6));
+                if (payload.chunk) box.innerHTML += esc(payload.chunk).replace(/\n/g, '<br>');
+                if (payload.error) { box.innerHTML += `<span style="color:var(--danger)">${esc(payload.error)}</span>`; }
+            }
+        }
+    } catch (e) { box.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+    btn.disabled = false;
+    btn.textContent = '生成本周总结';
+}
+
 // --- Calendar ---
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth() + 1;
